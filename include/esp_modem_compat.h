@@ -45,17 +45,17 @@ typedef struct {
 /**
  * @brief Backward compatible version of esp_modem_set_event_handler()
  */
-esp_err_t esp_modem_add_event_handler(modem_dte_t *dte, esp_event_handler_t handler, void *handler_args)  __attribute__ ((deprecated));
+esp_err_t esp_modem_add_event_handler(esp_modem_dte_t *dte, esp_event_handler_t handler, void *handler_args)  __attribute__ ((deprecated));
 
 /**
  * @brief Backward compatible version of creating esp-netif(PPP) and attaching to esp_modem_start_ppp()
  */
-esp_err_t esp_modem_setup_ppp(modem_dte_t *dte) __attribute__ ((deprecated));
+esp_err_t esp_modem_setup_ppp(esp_modem_dte_t *dte) __attribute__ ((deprecated));
 
 /**
  * @brief Backward compatible version of deleting esp-netif and  esp_modem_stop_ppp()
  */
-esp_err_t esp_modem_exit_ppp(modem_dte_t *dte) __attribute__ ((deprecated));
+esp_err_t esp_modem_exit_ppp(esp_modem_dte_t *dte) __attribute__ ((deprecated));
 
 #ifdef __cplusplus
 }

@@ -1,4 +1,4 @@
-// Copyright 2015-2018 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,130 +21,229 @@ extern "C" {
 #include "esp_err.h"
 #include "esp_modem_dte.h"
 
-typedef struct modem_dce modem_dce_t;
-typedef struct modem_dte modem_dte_t;
 
 /**
- * @brief Result Code from DCE
- *
- */
-#define MODEM_RESULT_CODE_SUCCESS "OK"              /*!< Acknowledges execution of a command */
-#define MODEM_RESULT_CODE_CONNECT "CONNECT"         /*!< A connection has been established */
-#define MODEM_RESULT_CODE_RING "RING"               /*!< Detect an incoming call signal from network */
-#define MODEM_RESULT_CODE_NO_CARRIER "NO CARRIER"   /*!< Connection termincated or establish a connection failed */
-#define MODEM_RESULT_CODE_ERROR "ERROR"             /*!< Command not recognized, command line maximum length exceeded, parameter value invalid */
-#define MODEM_RESULT_CODE_NO_DIALTONE "NO DIALTONE" /*!< No dial tone detected */
-#define MODEM_RESULT_CODE_BUSY "BUSY"               /*!< Engaged signal detected */
-#define MODEM_RESULT_CODE_NO_ANSWER "NO ANSWER"     /*!< Wait for quiet answer */
+* @brief Default configuration of DCE unit of ESP-MODEM
+*
+*/
+#define ESP_MODEM_DCE_DEFAULT_CFG(APN) \
+    {                                  \
+        .pdp_context = {               \
+            .cid = 1,                  \
+            .type = "IP",              \
+            .apn = APN },              \
+        .populate_command_list = false \
+    }
 
 /**
- * @brief Specific Length Constraint
- *
+ * @brief Forward declaration of the command list object, which (if enabled) is used
+ * to populate a command palette and access commands by its symbolic name
  */
-#define MODEM_MAX_NAME_LENGTH (32)     /*!< Max Module Name Length */
-#define MODEM_MAX_OPERATOR_LENGTH (32) /*!< Max Operator Name Length */
-#define MODEM_IMEI_LENGTH (15)         /*!< IMEI Number Length */
-#define MODEM_IMSI_LENGTH (15)         /*!< IMSI Number Length */
-
-/**
- * @brief Specific Timeout Constraint, Unit: millisecond
- *
- */
-#define MODEM_COMMAND_TIMEOUT_DEFAULT (500)      /*!< Default timeout value for most commands */
-#define MODEM_COMMAND_TIMEOUT_OPERATOR (75000)   /*!< Timeout value for getting operator status */
-#define MODEM_COMMAND_TIMEOUT_RESET (60000)   /*!< Timeout value for reset command */
-#define MODEM_COMMAND_TIMEOUT_MODE_CHANGE (5000) /*!< Timeout value for changing working mode */
-
-#define MODEM_COMMAND_TIMEOUT_POWEROFF (1000)    /*!< Timeout value for power down */
+struct esp_modem_dce_cmd_list;
 
 /**
  * @brief Working state of DCE
  *
  */
 typedef enum {
-    MODEM_STATE_PROCESSING, /*!< In processing */
-    MODEM_STATE_SUCCESS,    /*!< Process successfully */
-    MODEM_STATE_FAIL        /*!< Process failed */
-} modem_state_t;
+    ESP_MODEM_STATE_PROCESSING, /*!< In processing */
+    ESP_MODEM_STATE_SUCCESS,    /*!< Process successfully */
+    ESP_MODEM_STATE_FAIL        /*!< Process failed */
+} esp_modem_state_t;
 
+/**
+ * @brief Generic command type used in DCE unit
+ */
+typedef esp_err_t (*dce_command_t)(esp_modem_dce_t *dce, void *param, void *result);
 
+/**
+ * @brief Type of line handlers called fro DTE upon line response reception
+ */
+typedef esp_err_t (*esp_modem_dce_handle_line_t)(esp_modem_dce_t *dce, const char *line);
 
-typedef struct common_string_s {
-    const char * command;
-    char * string;
-    size_t len;
-} common_string_t;
+/**
+ * @brief PDP context type used as an input parameter to esp_modem_dce_set_pdp_context
+ * also used as a part of configuration structure
+ */
+typedef struct esp_modem_dce_pdp_ctx_s {
+    size_t cid;             /*!< PDP context identifier */
+    const char *type;       /*!< Protocol type */
+    const char *apn;        /*!< Modem APN (Access Point Name, a logical name to choose data network) */
+} esp_modem_dce_pdp_ctx_t;
 
-
-typedef struct cbc_ctx_s {
-    int battery_status;     //!< current status in mV
-    int bcs;                //!< charge status (-1-Not available, 0-Not charging, 1-Charging, 2-Charging done)
-    int bcl;                //!< 1-100% battery capacity, -1-Not available
-} cbc_ctx_t;
-
-typedef struct csq_ctx_s {
-    int rssi;             //!< Signal strength indication
-    int ber;              //!< Channel bit error rate
-} csq_ctx_t;
-
-typedef esp_err_t (*esp_modem_dce_handle_line_t)(modem_dce_t *dce, const char *line);
-
-esp_err_t esp_modem_dce_generic_command(modem_dce_t *dce, const char * command, uint32_t timeout, esp_modem_dce_handle_line_t handle_line, void *ctx);
-
-
-struct modem_dce_internal;
-
-typedef enum esp_modem_command_retry_strategy_e {
-    ESP_MODEM_COMMAND_FAIL_ON_ERROR = 0,
-    ESP_MODEM_COMMAND_RESEND_ON_ERROR,
-    ESP_MODEM_COMMAND_RESYNC_ON_ERROR,
-    ESP_MODEM_COMMAND_RESET_ON_ERROR,
-    ESP_MODEM_COMMAND_POWERCYCLE_ON_ERROR,
-} esp_modem_command_retry_strategy_t;
-
+/**
+ * @brief DCE's configuration structure
+ */
 typedef struct esp_modem_dce_config_s {
-    const char *apn;            //!< Access Ponit Name, a logical name to choose data network
-    int retries_after_timeout;  //!< Retry strategy: numbers of resending the same command on timeout
-    int retries_after_error;    //!< Retry strategy: numbers of resending the same command on error
-    esp_modem_command_retry_strategy_t retry_strategy;        //!< Retry strategy: calls
-
+    esp_modem_dce_pdp_ctx_t pdp_context;    /*!<  modem PDP context including APN */
+    bool populate_command_list;             /*!<  use command list interface: Setting this to true creates
+                                                  a list of supported AT commands enabling sending
+                                                  these commands, but will occupy data memory */
 } esp_modem_dce_config_t;
-
-#define ESP_MODEM_DCE_DEFAULT_CFG(APN) \
-    {                                  \
-        .apn = APN,                    \
-        .retries_after_timeout = 1,    \
-        .retries_after_error = 0,      \
-        .retry_strategy = ESP_MODEM_COMMAND_POWERCYCLE_ON_ERROR, \
-    }
 
 /**
  * @brief DCE(Data Communication Equipment)
  *
  */
-struct modem_dce {
-    modem_state_t state;                                                              /*!< Modem working state */
-    modem_mode_t mode;                                                                /*!< Working mode */
-    modem_dte_t *dte;                                                                 /*!< DTE which connect to DCE */
-    struct modem_dce_internal *dce_internal;
-    esp_modem_dce_handle_line_t handle_line;                                                        /*!< Handle line strategy */
-    esp_err_t (*sync)(modem_dce_t *dce);                                              /*!< Synchronization */
-    esp_err_t (*set_working_mode)(modem_dce_t *dce, modem_mode_t mode); /*!< Set working mode */
-    esp_err_t (*power_down)(modem_dce_t *dce);                          /*!< Normal power down */
-    esp_err_t (*deinit)(modem_dce_t *dce);                              /*!< Deinitialize */
-    esp_err_t (*power_up)(modem_dce_t *dce);                            /*!< Power up sequence */
-    esp_err_t (*reset)(modem_dce_t *dce);                               /*!< Reset sequence */
+struct esp_modem_dce {
+    esp_modem_state_t state;                                                    /*!< Modem working state */
+    esp_modem_mode_t mode;                                                      /*!< Working mode */
+    esp_modem_dte_t *dte;                                                       /*!< DTE which connect to DCE */
+    struct esp_modem_dce_cmd_list *dce_cmd_list;
+    esp_modem_dce_config_t config;
+    esp_modem_dce_handle_line_t handle_line;                                    /*!< Handle line strategy */
+
+    void *handle_line_ctx;                                                      /*!< DCE context reserved for handle_line
+                                                                                    processing */
+    // higher level actions DCE unit can take
+    esp_err_t (*set_working_mode)(esp_modem_dce_t *dce, esp_modem_mode_t mode); /*!< Set working mode */
+    esp_err_t (*deinit)(esp_modem_dce_t *dce);                                  /*!< Destroys the DCE */
+    esp_err_t (*start_up)(esp_modem_dce_t *dce);                                /*!< Start-up sequence */
+
+    // list of essential commands for esp-modem basic work
+    dce_command_t hang_up;                                                      /*!< generic command for hang-up */
+    dce_command_t set_pdp_context;                                              /*!< generic command for pdp context */
+    dce_command_t set_data_mode;                                                /*!< generic command for data mode */
+    dce_command_t set_command_mode;                                             /*!< generic command for command mode */
+    dce_command_t set_echo;                                                     /*!< generic command for echo mode */
+    dce_command_t sync;                                                         /*!< generic command for sync */
+    dce_command_t set_flow_ctrl;                                                /*!< generic command for flow-ctrl */
+    dce_command_t store_profile;                                                /*!< generic command for store-profile */
 };
 
-esp_err_t esp_modem_command(modem_dce_t *dce, const char * command, void * param, void* result);
 
-esp_err_t esp_modem_dce_default_deinit(modem_dce_t *dce);
+// DCE commands building blocks
+/**
+ * @brief Sending generic command to DCE
+ *
+ * @param[in] dce     Modem DCE object
+ * @param[in] command String command
+ * @param[in] timeout Command timeout in ms
+ * @param[in] handle_line Function ptr which processes the command response
+ * @param[in] ctx         Function ptr context
+ *
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ *      - ESP_ERR_TIMEOUT if timeout while waiting for expected response
+ */
+esp_err_t esp_modem_dce_generic_command(esp_modem_dce_t *dce, const char * command, uint32_t timeout, esp_modem_dce_handle_line_t handle_line, void *ctx);
 
-esp_err_t esp_modem_process_command_done(modem_dce_t *dce, modem_state_t state);
+/**
+ * @brief Indicate that processing current command has done
+ *
+ * @param dce Modem DCE object
+ * @param state Modem state after processing
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ */
+esp_err_t esp_modem_process_command_done(esp_modem_dce_t *dce, esp_modem_state_t state);
 
-//esp_err_t common_get_common_string(modem_dce_t *dce, void *ctx);
+/**
+ * @brief Default handler for response
+ * Some responses for command are simple, commonly will return OK when succeed of ERROR when failed
+ *
+ * @param dce Modem DCE object
+ * @param line line string
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ */
+esp_err_t esp_modem_dce_handle_response_default(esp_modem_dce_t *dce, const char *line);
 
 
+// DCE higher level commands
+/**
+ * @brief Set Working Mode
+ *
+ * @param dce Modem DCE object
+ * @param mode working mode
+ *
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ */
+esp_err_t esp_modem_dce_set_working_mode(esp_modem_dce_t *dce, esp_modem_mode_t mode);
+
+/**
+ * @brief Default start-up sequence, which sets the modem into an operational mode
+ *
+ * @param dce Modem DCE object
+ *
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ */
+esp_err_t esp_modem_dce_default_start_up(esp_modem_dce_t *dce);
+
+/**
+ * @brief Destroys the DCE
+ *
+ * @param dce Modem DCE object
+ *
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ */
+esp_err_t esp_modem_dce_default_destroy(esp_modem_dce_t *dce);
+
+/**
+ * @brief Initializes the DCE
+ *
+ * @param dce Modem DCE object
+ *
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ */
+esp_err_t esp_modem_dce_default_init(esp_modem_dce_t *dce, esp_modem_dce_config_t* config);
+
+
+// list command operations
+/**
+ * @brief Executes a specific command from the list
+ *
+ * @param dce       Modem DCE object
+ * @param command   Symbolic name of the command to execute
+ * @param param     Generic parameter to the command
+ * @param result    Generic output parameter
+ *
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ *      - ESP_ERR_TIMEOUT if timeout while waiting for expected response
+ */
+esp_err_t esp_modem_command_list_run(esp_modem_dce_t *dce, const char * command, void * param, void* result);
+
+/**
+ * @brief Deinitialize the command list
+ *
+ * @param dce       Modem DCE object
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_modem_command_list_deinit(esp_modem_dce_t *dce);
+
+/**
+ * @brief Initializes default command list with predefined command palette
+ *
+ * @param dce       Modem DCE object
+ *
+ * @return ESP_OK on success, ESP_FAIL on error
+ */
+esp_err_t esp_modem_set_default_command_list(esp_modem_dce_t *dce);
+
+/**
+ * @brief Add or set specific command to the command list
+ *
+ * @param dce        Modem DCE object
+ * @param command_id Command symbolic name
+ * @param command    Generic command function pointer
+ *
+ * @return ESP_OK on success, ESP_FAIL on error
+ */
+esp_err_t esp_modem_command_list_set_cmd(esp_modem_dce_t *dce, const char * command_id, dce_command_t command);
 
 #ifdef __cplusplus
 }

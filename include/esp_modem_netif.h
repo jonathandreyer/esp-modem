@@ -24,7 +24,7 @@ extern "C" {
  *
  * @return opaque pointer to esp-modem IO driver used to attach to esp-netif
  */
-void *esp_modem_netif_setup(modem_dte_t *dte);
+void *esp_modem_netif_setup(esp_modem_dte_t *dte);
 
 /**
  * @brief Destroys the esp-netif driver handle

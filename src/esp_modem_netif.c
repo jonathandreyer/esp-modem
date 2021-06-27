@@ -22,7 +22,7 @@ static const char *TAG = "esp-modem-netif";
  */
 typedef struct esp_modem_netif_driver_s {
     esp_netif_driver_base_t base;           /*!< base structure reserved as esp-netif driver */
-    modem_dte_t            *dte;        /*!< ptr to the esp_modem objects (DTE) */
+    esp_modem_dte_t            *dte;        /*!< ptr to the esp_modem objects (DTE) */
 } esp_modem_netif_driver_t;
 
 /**
@@ -38,7 +38,7 @@ typedef struct esp_modem_netif_driver_s {
  */
 static esp_err_t esp_modem_dte_transmit(void *h, void *buffer, size_t len)
 {
-    modem_dte_t *dte = h;
+    esp_modem_dte_t *dte = h;
     if (dte->send_data(dte, (const char *)buffer, len) > 0) {
         return ESP_OK;
     }
@@ -58,7 +58,7 @@ static esp_err_t esp_modem_dte_transmit(void *h, void *buffer, size_t len)
 static esp_err_t esp_modem_post_attach_start(esp_netif_t * esp_netif, void * args)
 {
     esp_modem_netif_driver_t *driver = args;
-    modem_dte_t *dte = driver->dte;
+    esp_modem_dte_t *dte = driver->dte;
     const esp_netif_driver_ifconfig_t driver_ifconfig = {
             .driver_free_rx_buffer = NULL,
             .transmit = esp_modem_dte_transmit,
@@ -66,6 +66,7 @@ static esp_err_t esp_modem_post_attach_start(esp_netif_t * esp_netif, void * arg
     };
     driver->base.netif = esp_netif;
     ESP_ERROR_CHECK(esp_netif_set_driver_config(esp_netif, &driver_ifconfig));
+    return ESP_OK;
     return esp_modem_start_ppp(dte);
 }
 
@@ -85,7 +86,7 @@ static esp_err_t modem_netif_receive_cb(void *buffer, size_t len, void *context)
     return ESP_OK;
 }
 
-void *esp_modem_netif_setup(modem_dte_t *dte)
+void *esp_modem_netif_setup(esp_modem_dte_t *dte)
 {
     esp_modem_netif_driver_t *driver =  calloc(1, sizeof(esp_modem_netif_driver_t));
     if (driver == NULL) {
@@ -140,10 +141,10 @@ esp_err_t esp_modem_netif_set_default_handlers(void *h, esp_netif_t * esp_netif)
     if (ret != ESP_OK) {
         goto set_event_failed;
     }
-//    ret = esp_modem_set_event_handler(driver->dte, esp_netif_action_stop, ESP_MODEM_EVENT_PPP_STOP, esp_netif);
-//    if (ret != ESP_OK) {
-//        goto set_event_failed;
-//    }
+    ret = esp_modem_set_event_handler(driver->dte, esp_netif_action_stop, ESP_MODEM_EVENT_PPP_STOP, esp_netif);
+    if (ret != ESP_OK) {
+        goto set_event_failed;
+    }
     ret = esp_event_handler_register(IP_EVENT, IP_EVENT_PPP_GOT_IP, esp_netif_action_connected, esp_netif);
     if (ret != ESP_OK) {
         goto set_event_failed;

@@ -14,35 +14,36 @@
 #include <stdlib.h>
 #include <string.h>
 #include "esp_log.h"
-#include "bg96.h"
-#include "esp_modem_dce_internal.h"
+#include "esp_bg96.h"
+#include "esp_modem_internal.h"
+#include "esp_modem_dce_command_lib.h"
 
 
-static const char *DCE_TAG = "bg96";
+static const char *TAG = "bg96";
 
-modem_dce_t *bg96_create(modem_dte_t *dte, esp_modem_dce_config_t *config)
+esp_modem_dce_t *esp_bg96_create(esp_modem_dte_t *dte, esp_modem_dce_config_t *config)
 {
-    modem_dce_t *dce = calloc(1, sizeof(modem_dce_t));
-    ESP_MODEM_DCE_CHECK(dce, "calloc sim7600_dce failed", err);
-    esp_err_t err = bg96_init(dce, dte, config);
-    ESP_MODEM_DCE_CHECK(err == ESP_OK, "bg96_init has failed", err);
+    esp_modem_dce_t *dce = calloc(1, sizeof(esp_modem_dce_t));
+    ESP_MODEM_ERR_CHECK(dce, "calloc sim7600_dce failed", err);
+    esp_err_t err = esp_bg96_init(dce, dte, config);
+    ESP_MODEM_ERR_CHECK(err == ESP_OK, "bg96_init has failed", err);
     return dce;
 err:
     return NULL;
 }
 
-esp_err_t bg96_init(modem_dce_t *dce, modem_dte_t *dte, esp_modem_dce_config_t *config)
+esp_err_t esp_bg96_init(esp_modem_dce_t *dce, esp_modem_dte_t *dte, esp_modem_dce_config_t *config)
 {
     /* init the default DCE first */
-    ESP_MODEM_DCE_CHECK(dce && dte && config, "failed to init with zero dce, dte or configuration", err_params);
+    ESP_MODEM_ERR_CHECK(dce && dte && config, "failed to init with zero dce, dte or configuration", err_params);
     esp_err_t err = esp_modem_dce_default_init(dce, config);
-    ESP_MODEM_DCE_CHECK(err == ESP_OK, "dce default init has failed", err);
+    ESP_MODEM_ERR_CHECK(err == ESP_OK, "dce default init has failed", err);
     /* Bind DTE with DCE */
     dce->dte = dte;
     dte->dce = dce;
 
 //    ESP_MODEM_DCE_CHECK(esp_modem_dce_init_command_list(bg96_dce, sizeof(s_command_list) / sizeof(cmd_item_t), s_command_list) == ESP_OK, "init cmd list failed", err_io);
-    ESP_MODEM_DCE_CHECK(esp_modem_dce_set_default_commands(dce) == ESP_OK, "esp_modem_dce_set_default_commands failed", err);
+    ESP_MODEM_ERR_CHECK(esp_modem_set_default_command_list(dce) == ESP_OK, "esp_modem_dce_set_default_commands failed", err);
 
     // update the commands
 
@@ -66,10 +67,17 @@ esp_err_t bg96_init(modem_dce_t *dce, modem_dte_t *dte, esp_modem_dce_config_t *
 //    ESP_MODEM_DCE_CHECK(esp_modem_dce_sync(bg96_dce) == ESP_OK, "sync failed", err_io);
     /* Close echo */
 //    ESP_MODEM_DCE_CHECK(esp_modem_dce_echo(bg96_dce, false) == ESP_OK, "close echo mode failed", err_io);
-    ESP_ERROR_CHECK(esp_modem_command(dce, "sync", NULL, NULL));
-    ESP_ERROR_CHECK(esp_modem_command(dce, "set_echo", (void*)false, NULL));
-    ESP_ERROR_CHECK(esp_modem_command(dce, "set_flow_ctrl", (void*)MODEM_FLOW_CONTROL_NONE, NULL));
-    ESP_ERROR_CHECK(esp_modem_command(dce, "store_profile", NULL, NULL));
+    ESP_ERROR_CHECK(esp_modem_command_list_run(dce, "sync", NULL, NULL));
+    ESP_ERROR_CHECK(esp_modem_command_list_run(dce, "set_echo", (void *) false, NULL));
+    bool ready;
+    ESP_ERROR_CHECK(esp_modem_command_list_run(dce, "read_pin", NULL, &ready));
+    if (!ready) {
+        ESP_LOGE(TAG, "PIN not ready man");
+        ESP_ERROR_CHECK(esp_modem_command_list_run(dce, "set_pin", "1234", NULL));
+    }
+//    abort();
+    ESP_ERROR_CHECK(esp_modem_command_list_run(dce, "set_flow_ctrl", (void *) MODEM_FLOW_CONTROL_NONE, NULL));
+    ESP_ERROR_CHECK(esp_modem_command_list_run(dce, "store_profile", NULL, NULL));
 
     return ESP_OK;
 err:

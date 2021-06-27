@@ -21,16 +21,14 @@ extern "C" {
 #include "esp_modem.h"
 
 /**
- * @brief Create and initialize SIM800 object
+ * @brief Create and initialize SIM7600 object
  *
  * @param dte Modem DTE object
  * @return modem_dce_t* Modem DCE object
  */
+esp_modem_dce_t *esp_sim7600_create(esp_modem_dte_t *dte, esp_modem_dce_config_t *config);
 
-modem_dce_t *sim800_create(modem_dte_t *dte, esp_modem_dce_config_t *config);
-
-esp_err_t sim800_init(modem_dce_t *dce, modem_dte_t *dte, esp_modem_dce_config_t *config);
-
+esp_err_t esp_sim7600_init(esp_modem_dce_t *dce, esp_modem_dte_t *dte, esp_modem_dce_config_t *config);
 
 #ifdef __cplusplus
 }

@@ -101,7 +101,7 @@ typedef esp_err_t (*esp_modem_on_receive)(void *buffer, size_t len, void *contex
  * @return modem_dte_t*
  *      - Modem DTE object
  */
-modem_dte_t *esp_modem_dte_init(const esp_modem_dte_config_t *config);
+esp_modem_dte_t *esp_modem_dte_init(const esp_modem_dte_config_t *config);
 
 /**
  * @brief Register event handler for ESP Modem event loop
@@ -114,7 +114,7 @@ modem_dte_t *esp_modem_dte_init(const esp_modem_dte_config_t *config);
  *      - ESP_ERR_NO_MEM on allocating memory for the handler failed
  *      - ESP_ERR_INVALID_ARG on invalid combination of event base and event id
  */
-esp_err_t esp_modem_set_event_handler(modem_dte_t *dte, esp_event_handler_t handler, int32_t event_id, void *handler_args);
+esp_err_t esp_modem_set_event_handler(esp_modem_dte_t *dte, esp_event_handler_t handler, int32_t event_id, void *handler_args);
 
 /**
  * @brief Unregister event handler for ESP Modem event loop
@@ -125,7 +125,7 @@ esp_err_t esp_modem_set_event_handler(modem_dte_t *dte, esp_event_handler_t hand
  *      - ESP_OK on success
  *      - ESP_ERR_INVALID_ARG on invalid combination of event base and event id
  */
-esp_err_t esp_modem_remove_event_handler(modem_dte_t *dte, esp_event_handler_t handler);
+esp_err_t esp_modem_remove_event_handler(esp_modem_dte_t *dte, esp_event_handler_t handler);
 
 /**
  * @brief Setup PPP Session
@@ -135,7 +135,7 @@ esp_err_t esp_modem_remove_event_handler(modem_dte_t *dte, esp_event_handler_t h
  *      - ESP_OK on success
  *      - ESP_FAIL on error
  */
-esp_err_t esp_modem_start_ppp(modem_dte_t *dte);
+esp_err_t esp_modem_start_ppp(esp_modem_dte_t *dte);
 
 /**
  * @brief Exit PPP Session
@@ -145,7 +145,7 @@ esp_err_t esp_modem_start_ppp(modem_dte_t *dte);
  *      - ESP_OK on success
  *      - ESP_FAIL on error
  */
-esp_err_t esp_modem_stop_ppp(modem_dte_t *dte);
+esp_err_t esp_modem_stop_ppp(esp_modem_dte_t *dte);
 
 /**
  * @brief Setup on reception callback
@@ -156,8 +156,10 @@ esp_err_t esp_modem_stop_ppp(modem_dte_t *dte);
  *
  * @return ESP_OK on success
  */
-esp_err_t esp_modem_set_rx_cb(modem_dte_t *dte, esp_modem_on_receive receive_cb, void *receive_cb_ctx);
+esp_err_t esp_modem_set_rx_cb(esp_modem_dte_t *dte, esp_modem_on_receive receive_cb, void *receive_cb_ctx);
 
+
+esp_err_t esp_modem_default_netif_attach(esp_modem_dte_t *dte, esp_netif_t* ppp_netif)
 #ifdef __cplusplus
 }
 #endif

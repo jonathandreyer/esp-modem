@@ -1,66 +1,166 @@
 //
 // Created by david on 19.10.20.
 //
+#include <string.h>
+
 #include "esp_modem_dce.h"
-#include "esp_modem_dce_internal.h"
+#include "esp_modem_dce_command_lib.h"
+#include "esp_modem_dce_common_commands.h"
+#include "esp_modem_internal.h"
 #include "esp_log.h"
-//#include "esp_modem_dte.h"
 
-static const char *DCE_TAG = "esp_modem_dce";
+static const char *TAG = "esp_modem_dce";
 
-esp_err_t esp_modem_dce_generic_command(modem_dce_t *dce, const char * command, uint32_t timeout, esp_modem_dce_handle_line_t handle_line, void *ctx)
+esp_err_t esp_modem_dce_generic_command(esp_modem_dce_t *dce, const char * command, uint32_t timeout, esp_modem_dce_handle_line_t handle_line, void *ctx)
 {
-    modem_dte_t *dte = dce->dte;
-    int errors = 0;
-    int timeouts = 0;
-    while (timeouts <= dce->dce_internal->config.retries_after_timeout &&
-           errors <= dce->dce_internal->config.retries_after_error) {
-        if (timeouts || errors) {
-            // provide recovery action based on the defined strategy
-            switch (dce->dce_internal->config.retry_strategy) {
-                case ESP_MODEM_COMMAND_RESET_ON_ERROR:
-                    dce->reset(dce);
-                    break;
-                case ESP_MODEM_COMMAND_RESEND_ON_ERROR:
-                    // no recovery action, just plain resending
-                    break;
-                case ESP_MODEM_COMMAND_FAIL_ON_ERROR:
-                    return ESP_FAIL;
-                case ESP_MODEM_COMMAND_RESYNC_ON_ERROR:
-                    esp_modem_dce_sync(dce, NULL, NULL);
-                    break;
-                case ESP_MODEM_COMMAND_POWERCYCLE_ON_ERROR:
-                    dce->power_down(dce);
-                    dce->power_up(dce);
-                    break;
-            }
-        }
-        ESP_LOGD(DCE_TAG, "%s(%d): Sending command:%s...", __func__, __LINE__, command );
-        dce->handle_line = handle_line;
-        dce->dce_internal->handle_line_ctx = ctx;
-        if (dte->send_cmd(dte, command, timeout) != ESP_OK) {
-            ESP_LOGW(DCE_TAG, "%s(%d): Command:%s response timeout", __func__, __LINE__, command );
-            timeouts++;
-            continue;
-        }
-        if (dce->state == MODEM_STATE_FAIL) {
-            ESP_LOGW(DCE_TAG, "%s(%d): Command:%s failed", __func__, __LINE__, command );
-            errors++;
-            continue;
-        }
-        ESP_LOGD(DCE_TAG, "%s(%d): Command:%s succeeded", __func__, __LINE__, command );
-        return ESP_OK;
+    esp_modem_dte_t *dte = dce->dte;
+    ESP_LOGD(TAG, "%s(%d): Sending command:%s...", __func__, __LINE__, command );
+    dce->handle_line = handle_line;
+    dce->handle_line_ctx = ctx;
+    if (dte->send_cmd(dte, command, timeout) != ESP_OK) {
+        ESP_LOGW(TAG, "%s(%d): Command:%s response timeout", __func__, __LINE__, command );
+        return ESP_ERR_TIMEOUT;
     }
+    if (dce->state == ESP_MODEM_STATE_FAIL) {
+        ESP_LOGW(TAG, "%s(%d): Command:%s failed", __func__, __LINE__, command );
+        return ESP_FAIL;
+    }
+    ESP_LOGD(TAG, "%s(%d): Command:%s succeeded", __func__, __LINE__, command );
+    return ESP_OK;
+}
+
+
+esp_err_t esp_modem_dce_default_init(esp_modem_dce_t *dce, esp_modem_dce_config_t* config)
+{
+    // Check parameters
+    ESP_MODEM_ERR_CHECK(dce && config, "dce object or configuration is NULL", err);
+
+    // Set default commands needed for the DCE to operate
+    // note: command links will be overwritten if cmd-list enabled
+    dce->set_data_mode = esp_modem_dce_set_data_mode;
+    dce->set_command_mode = esp_modem_dce_set_command_mode;
+    dce->set_pdp_context = esp_modem_dce_set_pdp_context;
+    dce->hang_up = esp_modem_dce_hang_up;
+    dce->set_echo = esp_modem_dce_set_echo;
+    dce->sync = esp_modem_dce_sync;
+    dce->set_flow_ctrl = esp_modem_dce_set_flow_ctrl;
+    dce->store_profile = esp_modem_dce_store_profile;
+
+    // save the config
+    memcpy(&dce->config, config, sizeof(esp_modem_dce_config_t));
+
+    // set DCE basic API
+    dce->start_up = esp_modem_dce_default_start_up;
+    dce->deinit = esp_modem_dce_default_destroy;
+    dce->set_working_mode = esp_modem_dce_set_working_mode;
+
+    // initialize the list if enabled
+    if (config->populate_command_list) {
+        dce->dce_cmd_list = esp_modem_command_list_create();
+        ESP_MODEM_ERR_CHECK(dce->dce_cmd_list, "Allocation of dce internal object has failed", err);
+    }
+    return ESP_OK;
+err:
+    return ESP_ERR_NO_MEM;
+}
+
+esp_err_t esp_modem_dce_default_destroy(esp_modem_dce_t *dce)
+{
+    ESP_MODEM_ERR_CHECK(esp_modem_command_list_deinit(dce) == ESP_OK, "failed", err);
+    free(dce);
+    return ESP_OK;
+err:
+    return ESP_FAIL;
+}
+
+esp_err_t esp_modem_dce_handle_response_default(esp_modem_dce_t *dce, const char *line)
+{
+    esp_err_t err = ESP_FAIL;
+    if (strstr(line, MODEM_RESULT_CODE_SUCCESS)) {
+        err = esp_modem_process_command_done(dce, ESP_MODEM_STATE_SUCCESS);
+    } else if (strstr(line, MODEM_RESULT_CODE_ERROR)) {
+        err = esp_modem_process_command_done(dce, ESP_MODEM_STATE_FAIL);
+    }
+    return err;
+}
+
+esp_err_t esp_modem_process_command_done(esp_modem_dce_t *dce, esp_modem_state_t state)
+{
+    dce->state = state;
+    return dce->dte->process_cmd_done(dce->dte);
+}
+
+static esp_err_t esp_modem_switch_to_command_mode(esp_modem_dce_t *dce)
+{
+    if (dce->set_command_mode(dce, NULL, NULL) != ESP_OK) {
+        // exiting data mode could fail if the modem is already in command mode via PPP netif closed
+        ESP_MODEM_ERR_CHECK(dce->sync(dce, NULL, NULL) == ESP_OK, "sync after PPP exit failed", err);
+    } else {
+        // hang-up if exit PPP succeeded
+        dce->mode = MODEM_COMMAND_MODE;
+        ESP_MODEM_ERR_CHECK(dce->hang_up(dce, NULL, NULL) == ESP_OK, "hang-up after PPP exit failed", err);
+    }
+    dce->mode = MODEM_COMMAND_MODE;
+    return ESP_OK;
+    err:
+    return ESP_FAIL;
+}
+
+static esp_err_t esp_modem_switch_to_data_mode(esp_modem_dce_t *dce)
+{
+    // before going to data mode, set the PDP data context
+    ESP_MODEM_ERR_CHECK(dce->set_pdp_context(dce, &dce->config.pdp_context, NULL) == ESP_OK, "setting pdp context failed", err);
+    // now set the data mode
+    ESP_MODEM_ERR_CHECK(dce->set_data_mode(dce, NULL, NULL) == ESP_OK, "setting data mode failed", err);
+    dce->mode = MODEM_PPP_MODE;
+    return ESP_OK;
+    err:
     return ESP_FAIL;
 }
 
 
-esp_err_t esp_modem_dce_default_deinit(modem_dce_t *dce)
+/**
+ * @brief Set Working Mode
+ *
+ * @param dce Modem DCE object
+ * @param mode working mode
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ */
+esp_err_t esp_modem_dce_set_working_mode(esp_modem_dce_t *dce, esp_modem_mode_t mode)
 {
-    if (dce->dte) {
-        dce->dte->dce = NULL;
+    switch (mode) {
+        case MODEM_COMMAND_MODE:
+            ESP_MODEM_ERR_CHECK(esp_modem_switch_to_command_mode(dce) == ESP_OK, "Setting command mode failed", err);
+            break;
+        case MODEM_PPP_MODE:
+            ESP_MODEM_ERR_CHECK(esp_modem_switch_to_data_mode(dce) == ESP_OK, "Setting data mode failed", err);
+            break;
+        default:
+            ESP_LOGW(TAG, "unsupported working mode: %d", mode);
+            goto err;
     }
-    esp_modem_dce_delete_all_commands(dce);
-    free(dce->dce_internal);
     return ESP_OK;
+    err:
+    return ESP_FAIL;
+}
+
+esp_err_t esp_modem_dce_default_start_up(esp_modem_dce_t *dce)
+{
+    ESP_MODEM_ERR_CHECK(dce->sync(dce, NULL, NULL) == ESP_OK, "sending sync failed", err);
+    ESP_MODEM_ERR_CHECK(dce->set_echo(dce, (void*)false, NULL) == ESP_OK, "set_echo failed", err);
+    // TODO: remove!
+    bool ready;
+    ESP_ERROR_CHECK(esp_modem_command_list_run(dce, "read_pin", NULL, &ready));
+    if (!ready) {
+        ESP_LOGE(TAG, "PIN not ready man");
+        ESP_ERROR_CHECK(esp_modem_command_list_run(dce, "set_pin", "1234", NULL));
+    }
+    // TODO: remove!
+    ESP_MODEM_ERR_CHECK(dce->set_flow_ctrl(dce, (void*)MODEM_FLOW_CONTROL_NONE, NULL) == ESP_OK, "set_flow_ctrl failed", err);
+    ESP_MODEM_ERR_CHECK(dce->store_profile(dce, NULL, NULL) == ESP_OK, "store_profile failed", err);
+    return ESP_OK;
+    err:
+    return ESP_FAIL;
 }
