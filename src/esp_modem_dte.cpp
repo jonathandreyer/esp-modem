@@ -12,19 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "cxx_include/esp_modem_dte.hpp"
 #include <cstring>
 #include "esp_log.h"
+#include "cxx_include/esp_modem_dte.hpp"
+#include "esp_modem_config.h"
 
 using namespace esp_modem;
 
-const int DTE_BUFFER_SIZE = 1024;
+static const size_t dte_default_buffer_size = 1000;
 
-DTE::DTE(std::unique_ptr<Terminal> terminal):
-        buffer_size(DTE_BUFFER_SIZE), consumed(0),
+DTE::DTE(const esp_modem_dte_config *config, std::unique_ptr<Terminal> terminal):
+        buffer_size(config->dte_buffer_size), consumed(0),
         buffer(std::make_unique<uint8_t[]>(buffer_size)),
         term(std::move(terminal)), command_term(term.get()), other_term(nullptr),
         mode(modem_mode::UNDEF) {}
+
+DTE::DTE(std::unique_ptr<Terminal> terminal):
+    buffer_size(dte_default_buffer_size), consumed(0),
+    buffer(std::make_unique<uint8_t[]>(buffer_size)),
+    term(std::move(terminal)), command_term(term.get()), other_term(nullptr),
+    mode(modem_mode::UNDEF) {}
 
 command_result DTE::command(const std::string &command, got_line_cb got_line, uint32_t time_ms, const char separator)
 {
@@ -56,6 +63,11 @@ command_result DTE::command(const std::string &command, got_line_cb got_line, ui
     return res;
 }
 
+command_result DTE::command(const std::string &cmd, got_line_cb got_line, uint32_t time_ms)
+{
+    return command(cmd, got_line, time_ms, '\n');
+}
+
 bool DTE::setup_cmux()
 {
     auto original_term = std::move(term);
@@ -75,7 +87,46 @@ bool DTE::setup_cmux()
     return true;
 }
 
-command_result DTE::command(const std::string &cmd, got_line_cb got_line, uint32_t time_ms)
+bool DTE::set_mode(modem_mode m)
 {
-    return command(cmd, got_line, time_ms, '\n');
+    term->start();
+    mode = m;
+    if (m == modem_mode::DATA_MODE) {
+        term->set_read_cb(on_data);
+        if (other_term) { // if we have the other terminal, let's use it for commands
+            command_term = other_term.get();
+        }
+    } else if (m == modem_mode::CMUX_MODE) {
+        return setup_cmux();
+    }
+    return true;
+}
+
+void DTE::set_read_cb(std::function<bool(uint8_t *, size_t)> f)
+{
+    on_data = std::move(f);
+    term->set_read_cb([this](uint8_t *data, size_t len) {
+        if (!data) { // if no data available from terminal callback -> need to explicitly read some
+            auto data_to_read = std::min(len, buffer_size - consumed);
+            data = buffer.get();
+            len = term->read(data, data_to_read);
+        }
+        if (on_data)
+            return on_data(data, len);
+        return false;
+    });
+}
+
+int DTE::read(uint8_t **d, size_t len)
+{
+    auto data_to_read = std::min(len, buffer_size);
+    auto data = buffer.get();
+    auto actual_len = term->read(data, data_to_read);
+    *d = data;
+    return actual_len;
+}
+
+int DTE::write(uint8_t *data, size_t len)
+{
+    return term->write(data, len);
 }
