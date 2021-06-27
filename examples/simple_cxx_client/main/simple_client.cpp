@@ -12,20 +12,26 @@
 #include "esp_netif.h"
 #include "esp_netif_ppp.h"
 #include "mqtt_client.h"
-#include "esp_modem_api.h"
 #include "esp_log.h"
+#include "cxx_include/esp_modem_dte.hpp"
+#include "esp_modem_config.h"
+#include "cxx_include/esp_modem_api.hpp"
+#include <iostream>
 
 #define BROKER_URL "mqtt://mqtt.eclipseprojects.io"
 
-static const char *TAG = "pppos_example";
+using namespace esp_modem;
+
+static const char *TAG = "cmux_example";
+
 static EventGroupHandle_t event_group = NULL;
 static const int CONNECT_BIT = BIT0;
-//static const int STOP_BIT = BIT1;
+static const int STOP_BIT = BIT1;
 static const int GOT_DATA_BIT = BIT2;
 
-
-static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
+    esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
     esp_mqtt_client_handle_t client = event->client;
     int msg_id;
     switch (event->event_id) {
@@ -61,7 +67,6 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
         ESP_LOGI(TAG, "MQTT other event id: %d", event->event_id);
         break;
     }
-    return ESP_OK;
 }
 
 static void on_ppp_changed(void *arg, esp_event_base_t event_base,
@@ -70,7 +75,7 @@ static void on_ppp_changed(void *arg, esp_event_base_t event_base,
     ESP_LOGI(TAG, "PPP state changed event %d", event_id);
     if (event_id == NETIF_PPP_ERRORUSER) {
         /* User interrupted event from esp-netif */
-        esp_netif_t *netif = event_data;
+        esp_netif_t *netif = (esp_netif_t *)event_data;
         ESP_LOGI(TAG, "User interrupted event from netif:%p", netif);
     }
 }
@@ -91,9 +96,9 @@ static void on_ip_event(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
         ESP_LOGI(TAG, "Netmask     : " IPSTR, IP2STR(&event->ip_info.netmask));
         ESP_LOGI(TAG, "Gateway     : " IPSTR, IP2STR(&event->ip_info.gw));
-        esp_netif_get_dns_info(netif, 0, &dns_info);
+        esp_netif_get_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns_info);
         ESP_LOGI(TAG, "Name Server1: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
-        esp_netif_get_dns_info(netif, 1, &dns_info);
+        esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns_info);
         ESP_LOGI(TAG, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
         ESP_LOGI(TAG, "~~~~~~~~~~~~~~");
         xEventGroupSetBits(event_group, CONNECT_BIT);
@@ -110,9 +115,9 @@ static void on_ip_event(void *arg, esp_event_base_t event_base,
 }
 
 
-void app_main(void)
-{
 
+extern "C" void app_main(void)
+{
     /* Init and register system/core components */
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -123,18 +128,6 @@ void app_main(void)
 
     /* Configure the DTE */
     esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
-    /* setup UART specific configuration based on kconfig options */
-    dte_config.tx_io_num = CONFIG_EXAMPLE_MODEM_UART_TX_PIN;
-    dte_config.rx_io_num = CONFIG_EXAMPLE_MODEM_UART_RX_PIN;
-    dte_config.rts_io_num = CONFIG_EXAMPLE_MODEM_UART_RTS_PIN;
-    dte_config.cts_io_num = CONFIG_EXAMPLE_MODEM_UART_CTS_PIN;
-    dte_config.rx_buffer_size = CONFIG_EXAMPLE_MODEM_UART_RX_BUFFER_SIZE;
-    dte_config.tx_buffer_size = CONFIG_EXAMPLE_MODEM_UART_TX_BUFFER_SIZE;
-    dte_config.pattern_queue_size = CONFIG_EXAMPLE_MODEM_UART_PATTERN_QUEUE_SIZE;
-    dte_config.event_queue_size = CONFIG_EXAMPLE_MODEM_UART_EVENT_QUEUE_SIZE;
-    dte_config.event_task_stack_size = CONFIG_EXAMPLE_MODEM_UART_EVENT_TASK_STACK_SIZE;
-    dte_config.event_task_priority = CONFIG_EXAMPLE_MODEM_UART_EVENT_TASK_PRIORITY;
-    dte_config.line_buffer_size = CONFIG_EXAMPLE_MODEM_UART_RX_BUFFER_SIZE / 2;
 
     /* Configure the DCE */
     esp_modem_dce_config_t dce_config = ESP_MODEM_DCE_DEFAULT_CONFIG(CONFIG_EXAMPLE_MODEM_PPP_APN);
@@ -142,48 +135,51 @@ void app_main(void)
     /* Configure the PPP netif */
     esp_netif_config_t netif_ppp_config = ESP_NETIF_DEFAULT_PPP();
 
-    /* Run the modem demo app */
-    // Init netif object
+    auto uart_dte = create_uart_dte(&dte_config);
+
     esp_netif_t *esp_netif = esp_netif_new(&netif_ppp_config);
     assert(esp_netif);
-    esp_modem_dce_t *dce = esp_modem_new(&dte_config, &dce_config, esp_netif);
-    int rssi, ber;
-    esp_err_t err = esp_modem_get_signal_quality(dce, &rssi, &ber);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_modem_get_signal_quality failed with %d", err);
-        return;
-    }
-    ESP_LOGI(TAG, "Signal quality: rssi=%d, ber=%d", rssi, ber);
 
-    err = esp_modem_set_mode(dce, ESP_MODEM_MODE_DATA);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_modem_set_mode(ESP_MODEM_MODE_DATA) failed with %d", err);
-        return;
+    auto dce = create_SIM7600_dce(&dce_config, uart_dte, esp_netif);
+    dce->set_command_mode();
+
+    std::string str;
+    dce->get_module_name(str);
+    std::cout << "Module name:" << str << std::endl;
+    bool pin_ok = true;
+    if (dce->read_pin(pin_ok) == command_result::OK && !pin_ok) {
+        throw_if_false(dce->set_pin("1234") == command_result::OK, "Cannot set PIN!");
     }
-    /* Wait for IP address */
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    dce->set_mode(esp_modem::modem_mode::CMUX_MODE);
+    dce->get_imsi(str);
+    std::cout << "Modem IMSI number:" << str << "|" << std::endl;
+
+    dce->set_data();
+
+    // MQTT connection
     xEventGroupWaitBits(event_group, CONNECT_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
-    /* Config MQTT */
-    esp_mqtt_client_config_t mqtt_config = {
-            .uri = BROKER_URL,
-            .event_handle = mqtt_event_handler,
-    };
+    esp_mqtt_client_config_t mqtt_config = { };
+    mqtt_config.uri = BROKER_URL;
     esp_mqtt_client_handle_t mqtt_client = esp_mqtt_client_init(&mqtt_config);
+    esp_mqtt_client_register_event(mqtt_client, MQTT_EVENT_ANY, mqtt_event_handler, NULL);
     esp_mqtt_client_start(mqtt_client);
-    xEventGroupWaitBits(event_group, GOT_DATA_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
-    esp_mqtt_client_destroy(mqtt_client);
-    err = esp_modem_set_mode(dce, ESP_MODEM_MODE_COMMAND);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_modem_set_mode(ESP_MODEM_MODE_COMMAND) failed with %d", err);
-        return;
-    }
-    char imsi[32];
-    err = esp_modem_get_imsi(dce, imsi);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_modem_get_imsi failed with %d", err);
-        return;
-    }
-    ESP_LOGI(TAG, "IMSI=%s", imsi);
 
-    esp_modem_destroy(dce);
-    esp_netif_destroy(esp_netif);
+    EventBits_t got_data = 0;
+    while (got_data == 0) { // reading IMSI number until we get published data from MQTT
+        dce->get_imsi(str);
+        std::cout << "Modem IMSI number:" << str << "|" << std::endl;
+        got_data = xEventGroupWaitBits(event_group, GOT_DATA_BIT, pdTRUE, pdTRUE, pdMS_TO_TICKS(500));
+    }
+    esp_mqtt_client_destroy(mqtt_client);
+
+    while (true) { // reading IMSI number after
+        dce->get_imsi(str);
+        std::cout << "Modem IMSI number:" << str << "|" << std::endl;
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
 }
+
+

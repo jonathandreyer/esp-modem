@@ -12,8 +12,6 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "esp_modem.h"
-#include "esp_modem_netif.h"
 #include "lwip/lwip_napt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -26,37 +24,41 @@
 static const char *TAG = "ap-2-pppos";
 static EventGroupHandle_t event_group = NULL;
 static const int CONNECT_BIT = BIT0;
+static const int DISCONNECT_BIT = BIT1;
 
-static void on_ip_event(void *arg, esp_event_base_t event_base,
-                        int32_t event_id, void *event_data)
+static void on_modem_event(void *arg, esp_event_base_t event_base,
+                           int32_t event_id, void *event_data)
 {
-    ESP_LOGD(TAG, "IP event! %d", event_id);
-    if (event_id == IP_EVENT_PPP_GOT_IP) {
-        esp_netif_dns_info_t dns_info;
+    if (event_base == IP_EVENT) {
+        ESP_LOGD(TAG, "IP event! %d", event_id);
+        if (event_id == IP_EVENT_PPP_GOT_IP) {
+            esp_netif_dns_info_t dns_info;
 
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        esp_netif_t *netif = event->esp_netif;
 
-        ESP_LOGI(TAG, "Modem Connect to PPP Server");
-        ESP_LOGI(TAG, "~~~~~~~~~~~~~~");
-        ESP_LOGI(TAG, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
-        ESP_LOGI(TAG, "Netmask     : " IPSTR, IP2STR(&event->ip_info.netmask));
-        ESP_LOGI(TAG, "Gateway     : " IPSTR, IP2STR(&event->ip_info.gw));
-        esp_netif_get_dns_info(netif, 0, &dns_info);
-        ESP_LOGI(TAG, "Name Server1: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
-        esp_netif_get_dns_info(netif, 1, &dns_info);
-        ESP_LOGI(TAG, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
-        ESP_LOGI(TAG, "~~~~~~~~~~~~~~");
-        xEventGroupSetBits(event_group, CONNECT_BIT);
+            ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+            esp_netif_t *netif = event->esp_netif;
 
-        ESP_LOGI(TAG, "GOT ip event!!!");
-    } else if (event_id == IP_EVENT_PPP_LOST_IP) {
-        ESP_LOGI(TAG, "Modem Disconnect from PPP Server");
-    } else if (event_id == IP_EVENT_GOT_IP6) {
-        ESP_LOGI(TAG, "GOT IPv6 event!");
+            ESP_LOGI(TAG, "Modem Connect to PPP Server");
+            ESP_LOGI(TAG, "~~~~~~~~~~~~~~");
+            ESP_LOGI(TAG, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
+            ESP_LOGI(TAG, "Netmask     : " IPSTR, IP2STR(&event->ip_info.netmask));
+            ESP_LOGI(TAG, "Gateway     : " IPSTR, IP2STR(&event->ip_info.gw));
+            esp_netif_get_dns_info(netif, 0, &dns_info);
+            ESP_LOGI(TAG, "Name Server1: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
+            esp_netif_get_dns_info(netif, 1, &dns_info);
+            ESP_LOGI(TAG, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
+            ESP_LOGI(TAG, "~~~~~~~~~~~~~~");
+            xEventGroupSetBits(event_group, CONNECT_BIT);
 
-        ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
-        ESP_LOGI(TAG, "Got IPv6 address " IPV6STR, IPV62STR(event->ip6_info.ip));
+            ESP_LOGI(TAG, "GOT ip event!!!");
+        } else if (event_id == IP_EVENT_PPP_LOST_IP) {
+            ESP_LOGI(TAG, "Modem Disconnect from PPP Server");
+            xEventGroupSetBits(event_group, DISCONNECT_BIT);
+        } else if (event_id == IP_EVENT_GOT_IP6) {
+            ESP_LOGI(TAG, "GOT IPv6 event!");
+            ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
+            ESP_LOGI(TAG, "Got IPv6 address " IPV6STR, IPV62STR(event->ip6_info.ip));
+        }
     }
 }
 
@@ -120,7 +122,9 @@ void wifi_init_softap(void)
              EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS, EXAMPLE_ESP_WIFI_CHANNEL);
 }
 
-esp_modem_dce_t *sim7600_board_create(esp_modem_dce_config_t *config);
+esp_err_t modem_init_network(esp_netif_t *netif);
+void modem_start_network();
+void modem_stop_network();
 
 void app_main(void)
 {
@@ -137,33 +141,41 @@ void app_main(void)
     event_group = xEventGroupCreate();
 
     // init the DTE
-    esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
-    dte_config.event_task_stack_size = 4096;
-    dte_config.rx_buffer_size = 4096;
-    dte_config.tx_buffer_size = 2048;
-    esp_modem_dce_config_t dce_config = ESP_MODEM_DCE_DEFAULT_CONFIG("internet");
-    dce_config.populate_command_list = true;
     esp_netif_config_t ppp_netif_config = ESP_NETIF_DEFAULT_PPP();
-
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &on_ip_event, NULL));
-
-    // Initialize esp-modem units, DTE, DCE, ppp-netif
-    esp_modem_dte_t *dte = esp_modem_dte_new(&dte_config);
-    esp_modem_dce_t *dce = sim7600_board_create(&dce_config);
     esp_netif_t *ppp_netif = esp_netif_new(&ppp_netif_config);
-
     assert(ppp_netif);
 
-    ESP_ERROR_CHECK(esp_modem_default_attach(dte, dce, ppp_netif));
+    ESP_ERROR_CHECK(modem_init_network(ppp_netif));
+//    vTaskDelay(pdMS_TO_TICKS(1000));
+//    esp_modem_dte_config_t dte_config = ESP_MODEM_DTE_DEFAULT_CONFIG();
+//    dte_config.event_task_stack_size = 4096;
+//    dte_config.rx_buffer_size = 16384;
+//    dte_config.tx_buffer_size = 2048;
+//    esp_modem_dce_config_t dce_config = ESP_MODEM_DCE_DEFAULT_CONFIG("internet23");
+//    dce_config.populate_command_list = true;
 
-    void *modem_netif_adapter = esp_modem_netif_setup(dte);
-    esp_modem_netif_set_default_handlers(modem_netif_adapter, ppp_netif);
-    esp_netif_attach(ppp_netif, modem_netif_adapter);
-    ESP_ERROR_CHECK(esp_modem_default_start(dte)); // use retry
-    ESP_ERROR_CHECK(esp_modem_start_ppp(dte));
-    /* Wait for IP address */
-    xEventGroupWaitBits(event_group, CONNECT_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
 
+    // Initialize esp-modem units, DTE, DCE, ppp-netif
+//    esp_modem_dte_t *dte = esp_modem_dte_new(&dte_config);
+//    esp_modem_dce_t *dce = sim7600_board_create(&dce_config);
+//
+//    ESP_ERROR_CHECK(esp_modem_set_event_handler(dte, on_modem_event, ESP_EVENT_ANY_ID, dte));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, on_modem_event, NULL));
+//
+//    ESP_ERROR_CHECK(esp_modem_default_attach(dte, dce, ppp_netif));
+//
+//    ESP_ERROR_CHECK(esp_modem_default_start(dte)); // use retry
+//    ESP_ERROR_CHECK(esp_modem_start_ppp(dte));
+    modem_start_network();
+    /* Wait for the first connection */
+    EventBits_t bits;
+    do {
+        bits = xEventGroupWaitBits(event_group, (CONNECT_BIT | DISCONNECT_BIT), pdTRUE, pdFALSE, portMAX_DELAY);
+        if (bits&DISCONNECT_BIT) {
+        }
+    } while ((bits&CONNECT_BIT) == 0);
+
+    /* Init the AP with NAT enabled */
     esp_netif_t *ap_netif = esp_netif_create_default_wifi_ap();
     assert(ap_netif);
     esp_netif_dns_info_t dns;
@@ -172,5 +184,12 @@ void app_main(void)
 
     wifi_init_softap();
     ip_napt_enable(_g_esp_netif_soft_ap_ip.ip.addr, 1);
+
+    /* Provide recovery if disconnection of some kind registered */
+    while (DISCONNECT_BIT&xEventGroupWaitBits(event_group, DISCONNECT_BIT, pdTRUE, pdFALSE, portMAX_DELAY)) {
+        // restart the modem PPP mode
+        modem_stop_network();
+        modem_start_network();
+    }
 
 }

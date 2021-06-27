@@ -13,7 +13,7 @@
 #include "esp_modem_dce.h"
 #include "esp_modem_dce_common_commands.h"
 
-#define ESP_MODEM_EXAMPLE_CHECK(a, str, goto_tag, ...)                                              \
+#define ESP_MODEM_EXAMPLE_CHECK(a, str, goto_tag, ...)                                \
     do                                                                                \
     {                                                                                 \
         if (!(a))                                                                     \
@@ -65,7 +65,7 @@ esp_err_t sim7600_board_reset(esp_modem_dce_t *dce)
     return ESP_OK;
 }
 
-esp_err_t sim7600_board_start_up(esp_modem_dce_t *dce)
+esp_err_t sim7600_board_power_up(esp_modem_dce_t *dce)
 {
     sim7600_board_t *board = __containerof(dce, sim7600_board_t, parent);
     ESP_LOGI(TAG, "sim7600_board_power_up!");
@@ -93,7 +93,7 @@ static esp_err_t my_recov(esp_modem_recov_resend_t *retry_cmd, esp_err_t err, in
         if (timeouts < 2) {
             // first timeout, try to exit data mode and sync again
             dce->set_command_mode(dce, NULL, NULL);
-            dce->sync(dce, NULL, NULL);
+            esp_modem_dce_sync(dce, NULL, NULL);
         } else if (timeouts < 3) {
             // try to reset with GPIO if resend didn't help
             sim7600_board_t *board = __containerof(dce, sim7600_board_t, parent);
@@ -102,7 +102,7 @@ static esp_err_t my_recov(esp_modem_recov_resend_t *retry_cmd, esp_err_t err, in
             // otherwise power-cycle the board
             sim7600_board_t *board = __containerof(dce, sim7600_board_t, parent);
             board->power_down(dce);
-            dce->sync(dce, NULL, NULL);
+            esp_modem_dce_sync(dce, NULL, NULL);
         }
     } else {
         // check if a PIN needs to be supplied in case of a failure
@@ -111,6 +111,7 @@ static esp_err_t my_recov(esp_modem_recov_resend_t *retry_cmd, esp_err_t err, in
         if (!ready) {
             esp_modem_dce_set_pin(dce, "1234", NULL);
         }
+        vTaskDelay(1000 / portTICK_RATE_MS);
         esp_modem_dce_read_pin(dce, NULL, &ready);
         if (!ready) {
             return ESP_FAIL;
@@ -122,6 +123,19 @@ static esp_err_t my_recov(esp_modem_recov_resend_t *retry_cmd, esp_err_t err, in
 static DEFINE_RETRY_CMD(re_sync_fn, re_sync, sim7600_board_t)
 
 static DEFINE_RETRY_CMD(re_store_profile_fn, re_store_profile, sim7600_board_t)
+
+esp_err_t sim7600_board_start_up(esp_modem_dce_t *dce)
+{
+//    sim7600_board_t *board = __containerof(dce, sim7600_board_t, parent);
+    ESP_MODEM_EXAMPLE_CHECK(re_sync_fn(dce, NULL, NULL) == ESP_OK, "sending sync failed", err);
+    ESP_MODEM_EXAMPLE_CHECK(dce->set_echo(dce, (void*)false, NULL) == ESP_OK, "set_echo failed", err);
+    ESP_MODEM_EXAMPLE_CHECK(dce->set_flow_ctrl(dce, (void*)ESP_MODEM_FLOW_CONTROL_NONE, NULL) == ESP_OK, "set_flow_ctrl failed", err);
+    ESP_MODEM_EXAMPLE_CHECK(dce->store_profile(dce, NULL, NULL) == ESP_OK, "store_profile failed", err);
+    return ESP_OK;
+err:
+    return ESP_FAIL;
+
+}
 
 esp_modem_dce_t *sim7600_board_create(esp_modem_dce_config_t *config)
 {
@@ -137,9 +151,9 @@ esp_modem_dce_t *sim7600_board_create(esp_modem_dce_config_t *config)
     board->parent.deinit = sim7600_board_deinit;
     board->reset = sim7600_board_reset;
     board->power_down = sim7600_board_power_down;
-    board->re_sync = esp_modem_recov_resend_new(&board->parent, board->parent.sync, my_recov, 10, 2);
-    board->parent.sync = re_sync_fn;
-    board->re_store_profile = esp_modem_recov_resend_new(&board->parent, board->parent.store_profile, my_recov, 2, 5);
+    board->re_sync = esp_modem_recov_resend_new(&board->parent, board->parent.sync, my_recov, 5, 1);
+    board->parent.start_up = sim7600_board_start_up;
+    board->re_store_profile = esp_modem_recov_resend_new(&board->parent, board->parent.store_profile, my_recov, 2, 3);
     board->parent.store_profile = re_store_profile_fn;
 
     return &board->parent;
