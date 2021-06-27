@@ -56,7 +56,7 @@ class CMuxInstance;
 class CMux {
 public:
     explicit CMux(std::unique_ptr<Terminal> t, std::unique_ptr<uint8_t[]> b, size_t buff_size):
-            term(std::move(t)), buffer_size(buff_size), buffer(std::move(b)) {}
+            term(std::move(t)), buffer_size(buff_size), buffer(std::move(b)), payload_start(nullptr), total_payload_size(0) {}
     ~CMux() = default;
     [[nodiscard]] bool init();
     void set_read_cb(int inst, std::function<bool(uint8_t *data, size_t len)> f);
@@ -80,6 +80,8 @@ private:
     Lock lock;
     int instance;
     int sabm_ack;
+    uint8_t *payload_start;
+    size_t total_payload_size;
 
 };
 

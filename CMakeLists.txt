@@ -8,6 +8,7 @@ if(${target} STREQUAL "linux")
 else()
     set(platform_srcs src/esp_modem_primitives_freertos.cpp
                       src/esp_modem_uart.cpp
+                      src/esp_modem_term_uart.cpp
                       src/esp_modem_netif.cpp)
     set(dependencies driver)
 endif()
@@ -20,6 +21,7 @@ set(srcs ${platform_srcs}
         "src/esp_modem_factory.cpp"
         "src/esp_modem_cmux.cpp"
         "src/esp_modem_command_library.cpp"
+        "src/esp_modem_term_fs.cpp"
         "src/esp_modem_modules.cpp")
 
 set(include_dirs "include")
@@ -30,3 +32,5 @@ idf_component_register(SRCS "${srcs}"
                     REQUIRES ${dependencies})
 
 target_compile_features(${COMPONENT_LIB} PRIVATE cxx_std_17)
+
+set_target_properties(${COMPONENT_LIB} PROPERTIES COMPILE_FLAGS -Wno-format)
