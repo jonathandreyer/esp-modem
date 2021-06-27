@@ -109,9 +109,9 @@ private:
  */
 enum class Modem {
     GenericModule,      /*!< Default generic module with the most common commands */
-    SIM800,             /*!< Derived from the GenericModule with specifics applied to SIM800 model */
     SIM7600,            /*!< Derived from the GenericModule, specifics applied to SIM7600 model */
     BG96,               /*!< Derived from the GenericModule, specifics applied to BG69 model */
+    SIM800,             /*!< Derived from the GenericModule with specifics applied to SIM800 model */
 };
 
 /**
@@ -152,7 +152,7 @@ public:
 
 
     template <typename Module, typename ...Args>
-    std::shared_ptr<Module> build_shared_module(const config *cfg, Args&&... args)
+    static std::shared_ptr<Module> build_shared_module(const config *cfg, Args&&... args)
     {
         return build_module_T<Module>(cfg, std::forward<Args>(args)...);
     }
@@ -201,17 +201,36 @@ public:
         return nullptr;
     }
 
+    template <typename ...Args>
+    DCE* build(const config *cfg, Args&&... args)
+    {
+        switch (m) {
+            case Modem::SIM800:
+                return build<SIM800>(cfg, std::forward<Args>(args)...);
+            case Modem::SIM7600:
+                return build<SIM7600>(cfg, std::forward<Args>(args)...);
+            case Modem::BG96:
+                return build<BG96>(cfg, std::forward<Args>(args)...);
+            case Modem::GenericModule:
+                return build<GenericModule>(cfg, std::forward<Args>(args)...);
+            default:
+                break;
+        }
+        return nullptr;
+    }
+
 private:
     Modem m;
 
+protected:
     template <typename Module, typename Ptr = std::shared_ptr<Module>, typename ...Args>
-    Module build_module_T(const config *cfg, Args&&... args)
+    static Ptr build_module_T(const config *cfg, Args&&... args)
     {
         Builder<Module> b(std::forward<Args>(args)...);
-        return b.template create_module<Module>(cfg);
+        return b.template create_module<Ptr>(cfg);
     }
 
-protected:
+
     template <typename Module, typename Dce = DCE_T<Module>, typename DcePtr = Dce*,  typename ...Args>
     static DcePtr build_generic_DCE(const config *cfg, Args&&... args)
     {

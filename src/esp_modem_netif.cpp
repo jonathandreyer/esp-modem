@@ -27,7 +27,7 @@ void Netif::on_ppp_changed(void *arg, esp_event_base_t event_base,
                            int32_t event_id, void *event_data) {
     auto *ppp = static_cast<Netif *>(arg);
     if (event_id < NETIF_PP_PHASE_OFFSET) {
-        ESP_LOGI("TAG", "PPP state changed event %d", event_id);
+        ESP_LOGI("esp_modem_netif", "PPP state changed event %d", event_id);
         // only notify the modem on state/error events, ignoring phase transitions
         ppp->signal.set(PPP_EXIT);
     }
@@ -53,7 +53,7 @@ esp_err_t Netif::esp_modem_post_attach(esp_netif_t *esp_netif, void *args) {
     // check if PPP error events are enabled, if not, do enable the error occurred/state changed
     // to notify the modem layer when switching modes
     esp_netif_ppp_config_t ppp_config;
-//     esp_netif_ppp_get_params(esp_netif, &ppp_config);
+    esp_netif_ppp_get_params(esp_netif, &ppp_config);
     if (!ppp_config.ppp_error_event_enabled) {
         ppp_config.ppp_error_event_enabled = true;
         esp_netif_ppp_set_params(esp_netif, &ppp_config);
@@ -95,6 +95,11 @@ void Netif::stop() {
 }
 
 Netif::~Netif() {
+    if (signal.is_any(PPP_STARTED)) {
+        esp_netif_action_stop(driver.base.netif, nullptr, 0, nullptr);
+        signal.clear(PPP_STARTED);
+        signal.wait(PPP_EXIT, 30000);
+    }
     esp_event_handler_unregister(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed);
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_PPP_GOT_IP, esp_netif_action_connected);
     esp_event_handler_unregister(IP_EVENT, IP_EVENT_PPP_LOST_IP, esp_netif_action_disconnected);

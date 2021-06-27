@@ -26,7 +26,7 @@ DTE::DTE(std::unique_ptr<Terminal> terminal):
         term(std::move(terminal)), command_term(term.get()), other_term(nullptr),
         mode(modem_mode::UNDEF) {}
 
-command_result DTE::command(const std::string &command, got_line_cb got_line, uint32_t time_ms)
+command_result DTE::command(const std::string &command, got_line_cb got_line, uint32_t time_ms, const char separator)
 {
     Scoped<Lock> l(lock);
     command_result res = command_result::TIMEOUT;
@@ -37,7 +37,7 @@ command_result DTE::command(const std::string &command, got_line_cb got_line, ui
             len = command_term->read(data, data_to_read);
         }
         consumed += len;
-        if (memchr(data, '\n', len)) {
+        if (memchr(data, separator, len)) {
             res = got_line(data, consumed);
             if (res == command_result::OK || res == command_result::FAIL) {
                 signal.set(GOT_LINE);
@@ -56,13 +56,26 @@ command_result DTE::command(const std::string &command, got_line_cb got_line, ui
     return res;
 }
 
-void DTE::setup_cmux()
+bool DTE::setup_cmux()
 {
     auto original_term = std::move(term);
+    if (original_term == nullptr)
+        return false;
     auto cmux_term = std::make_shared<CMux>(std::move(original_term), std::move(buffer), buffer_size);
+    if (cmux_term == nullptr)
+        return false;
     buffer_size = 0;
-    cmux_term->init();
+    if (!cmux_term->init())
+        return false;
     term = std::make_unique<CMuxInstance>(cmux_term, 0);
+    if (term == nullptr)
+        return false;
     command_term = term.get(); // use command terminal as previously
     other_term = std::make_unique<CMuxInstance>(cmux_term, 1);
+    return true;
+}
+
+command_result DTE::command(const std::string &cmd, got_line_cb got_line, uint32_t time_ms)
+{
+    return command(cmd, got_line, time_ms, '\n');
 }
