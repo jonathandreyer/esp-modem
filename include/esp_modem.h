@@ -159,7 +159,7 @@ esp_err_t esp_modem_stop_ppp(esp_modem_dte_t *dte);
 esp_err_t esp_modem_set_rx_cb(esp_modem_dte_t *dte, esp_modem_on_receive receive_cb, void *receive_cb_ctx);
 
 
-esp_err_t esp_modem_default_netif_attach(esp_modem_dte_t *dte, esp_netif_t* ppp_netif)
+esp_err_t esp_modem_default_netif_attach(esp_modem_dte_t *dte, esp_netif_t* ppp_netif);
 #ifdef __cplusplus
 }
 #endif
