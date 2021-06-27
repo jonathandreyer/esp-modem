@@ -19,21 +19,10 @@ extern "C" {
 
 #include "esp_types.h"
 #include "esp_err.h"
+#include "esp_modem.h"
 #include "esp_modem_dte.h"
 
 
-/**
-* @brief Default configuration of DCE unit of ESP-MODEM
-*
-*/
-#define ESP_MODEM_DCE_DEFAULT_CFG(APN) \
-    {                                  \
-        .pdp_context = {               \
-            .cid = 1,                  \
-            .type = "IP",              \
-            .apn = APN },              \
-        .populate_command_list = false \
-    }
 
 /**
  * @brief Forward declaration of the command list object, which (if enabled) is used
@@ -61,25 +50,7 @@ typedef esp_err_t (*dce_command_t)(esp_modem_dce_t *dce, void *param, void *resu
  */
 typedef esp_err_t (*esp_modem_dce_handle_line_t)(esp_modem_dce_t *dce, const char *line);
 
-/**
- * @brief PDP context type used as an input parameter to esp_modem_dce_set_pdp_context
- * also used as a part of configuration structure
- */
-typedef struct esp_modem_dce_pdp_ctx_s {
-    size_t cid;             /*!< PDP context identifier */
-    const char *type;       /*!< Protocol type */
-    const char *apn;        /*!< Modem APN (Access Point Name, a logical name to choose data network) */
-} esp_modem_dce_pdp_ctx_t;
 
-/**
- * @brief DCE's configuration structure
- */
-typedef struct esp_modem_dce_config_s {
-    esp_modem_dce_pdp_ctx_t pdp_context;    /*!<  modem PDP context including APN */
-    bool populate_command_list;             /*!<  use command list interface: Setting this to true creates
-                                                  a list of supported AT commands enabling sending
-                                                  these commands, but will occupy data memory */
-} esp_modem_dce_config_t;
 
 /**
  * @brief DCE(Data Communication Equipment)
@@ -104,6 +75,7 @@ struct esp_modem_dce {
     dce_command_t hang_up;                                                      /*!< generic command for hang-up */
     dce_command_t set_pdp_context;                                              /*!< generic command for pdp context */
     dce_command_t set_data_mode;                                                /*!< generic command for data mode */
+    dce_command_t resume_data_mode;                                             /*!< generic command to resume already dialed data mode */
     dce_command_t set_command_mode;                                             /*!< generic command for command mode */
     dce_command_t set_echo;                                                     /*!< generic command for echo mode */
     dce_command_t sync;                                                         /*!< generic command for sync */

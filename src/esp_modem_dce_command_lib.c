@@ -1,4 +1,4 @@
-// Copyright 2015-2018 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2015-2020 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@ static const cmd_item_t s_command_list[] = {
         { .command = "hang_up", .function = esp_modem_dce_hang_up },
         { .command = "get_signal_quality", .function = esp_modem_dce_get_signal_quality },
         { .command = "set_data_mode", .function = esp_modem_dce_set_data_mode },
+        { .command = "resume_data_mode", .function = esp_modem_dce_resume_data_mode },
         { .command = "set_command_mode", .function = esp_modem_dce_set_command_mode },
         { .command = "get_battery_status", .function = esp_modem_dce_get_battery_status },
         { .command = "power_down", .function = esp_modem_dce_power_down },
@@ -65,6 +66,7 @@ static const cmd_item_t s_command_list[] = {
 static esp_err_t update_internal_command_refs(esp_modem_dce_t *dce)
 {
     ESP_MODEM_ERR_CHECK(dce->set_data_mode = esp_modem_dce_find_command(dce, "set_data_mode"), "cmd not found", err);
+    ESP_MODEM_ERR_CHECK(dce->resume_data_mode = esp_modem_dce_find_command(dce, "resume_data_mode"), "cmd not found", err);
     ESP_MODEM_ERR_CHECK(dce->set_command_mode = esp_modem_dce_find_command(dce, "set_command_mode"), "cmd not found", err);
     ESP_MODEM_ERR_CHECK(dce->set_pdp_context = esp_modem_dce_find_command(dce, "set_pdp_context"), "cmd not found", err);
     ESP_MODEM_ERR_CHECK(dce->hang_up = esp_modem_dce_find_command(dce, "hang_up"), "cmd not found", err);

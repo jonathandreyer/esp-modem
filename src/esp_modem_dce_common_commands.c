@@ -1,4 +1,4 @@
-// Copyright 2015-2018 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2015-2020 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -273,7 +273,7 @@ esp_err_t esp_modem_dce_store_profile(esp_modem_dce_t *dce, void *param, void *r
 esp_err_t esp_modem_dce_set_flow_ctrl(esp_modem_dce_t *dce, void *param, void *result)
 {
     esp_modem_dte_t *dte = dce->dte;
-    modem_flow_ctrl_t flow_ctrl = (modem_flow_ctrl_t)param;
+    esp_modem_flow_ctrl_t flow_ctrl = (esp_modem_flow_ctrl_t)param;
     char *command;
     int len = asprintf(&command, "AT+IFC=%d,%d\r", dte->flow_ctrl, flow_ctrl);
     if (len <= 0) {
@@ -320,6 +320,12 @@ esp_err_t esp_modem_dce_get_battery_status(esp_modem_dce_t *dce, void *param, vo
 esp_err_t esp_modem_dce_set_data_mode(esp_modem_dce_t *dce, void *param, void *result)
 {
     return esp_modem_dce_generic_command(dce, "ATD*99***1#\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE,
+                                         esp_modem_dce_handle_atd_ppp, NULL);
+}
+
+esp_err_t esp_modem_dce_resume_data_mode(esp_modem_dce_t *dce, void *param, void *result)
+{
+    return esp_modem_dce_generic_command(dce, "ATO\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE,
                                          esp_modem_dce_handle_atd_ppp, NULL);
 }
 

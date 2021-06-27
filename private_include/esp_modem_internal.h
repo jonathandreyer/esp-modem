@@ -17,6 +17,7 @@
 extern "C" {
 #endif
 
+#include "esp_log.h"
 #include "esp_modem.h"
 
 /**
@@ -32,6 +33,15 @@ extern "C" {
             goto goto_tag;                                                            \
         }                                                                             \
     } while (0)
+
+/**
+* @brief common modem delay function
+*
+*/
+static inline void esp_modem_wait_ms(size_t time)
+{
+    vTaskDelay(pdMS_TO_TICKS(time));
+}
 
 #ifdef __cplusplus
 }

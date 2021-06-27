@@ -1,0 +1,9 @@
+dependencies:
+  espressif/esp_modem:
+    component_hash: 127bc6ef397915dcb62e9919e129e85fba4317d0b5d8361d1b9fe7151ef7f267
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 0.0.5
+manifest_hash: a96ef5db7bac9c41730fc0e193adafeebb50b9f5d37014ae029fb8281b438245
+version: 1.0.0

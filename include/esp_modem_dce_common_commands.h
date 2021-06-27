@@ -103,7 +103,7 @@ esp_err_t esp_modem_dce_store_profile(esp_modem_dce_t *dce, void *param, void *r
  * @brief Set flow control mode of DCE in data mode
  *
  * @param[in] dce     Modem DCE object
- * @param[in] param   modem_flow_ctrl_t casted to (void*): flow control mode
+ * @param[in] param   esp_modem_flow_ctrl_t casted to (void*): flow control mode
  * @param[out] result None
  *
  * @return esp_err_t
@@ -257,6 +257,21 @@ esp_err_t esp_modem_dce_get_operator_name(esp_modem_dce_t *dce, void *param, voi
  *      - ESP_ERR_TIMEOUT if timeout while waiting for expected response
  */
 esp_err_t esp_modem_dce_set_data_mode(esp_modem_dce_t *dce, void *param, void *result);
+
+/**
+ * @brief Resume the data mode when PPP has already been started, but switched back to command
+ * mode (typically using the `+++` PPP escape sequence)
+ *
+ * @param[in] dce     Modem DCE object
+ * @param[in] param   None
+ * @param[out] result None
+ *
+ * @return esp_err_t
+ *      - ESP_OK on success
+ *      - ESP_FAIL on error
+ *      - ESP_ERR_TIMEOUT if timeout while waiting for expected response
+ */
+esp_err_t esp_modem_dce_resume_data_mode(esp_modem_dce_t *dce, void *param, void *result);
 
 /**
  * @brief Switch to command mode

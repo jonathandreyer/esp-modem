@@ -1,4 +1,4 @@
-// Copyright 2015-2018 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2015-2020 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,38 +15,26 @@
 #include <string.h>
 #include "esp_log.h"
 #include "esp_modem_dce_common_commands.h"
-#include "esp_sim800.h"
+#include "esp_modem_internal.h"
 
-#define MODEM_RESULT_CODE_POWERDOWN "POWER DOWN"
-
-/**
- * @brief Macro defined for error checking
- *
- */
-static const char *TAG = "sim800";
-#define ESP_MODEM_ERR_CHECK(a, str, goto_tag, ...)                                              \
-    do                                                                                \
-    {                                                                                 \
-        if (!(a))                                                                     \
-        {                                                                             \
-            ESP_LOGE(TAG, "%s(%d): " str, __FUNCTION__, __LINE__, ##__VA_ARGS__); \
-            goto goto_tag;                                                            \
-        }                                                                             \
-    } while (0)
-
+static const char *TAG = "esp_sim800";
 
 /**
- * @brief Handle response from AT+CPOWD=1
+ * @brief @brief Response to the SIM800 specific power-down command
  */
 static esp_err_t sim800_handle_power_down(esp_modem_dce_t *dce, const char *line)
 {
     esp_err_t err = ESP_FAIL;
-    if (strstr(line, MODEM_RESULT_CODE_POWERDOWN)) {
+    if (strstr(line, "POWER DOWN")) {
         err = esp_modem_process_command_done(dce, ESP_MODEM_STATE_SUCCESS);
     }
     return err;
 }
 
+/**
+ * @brief Response to the SIM800 specific data mode command
+ *
+ */
 static esp_err_t sim800_handle_atd_ppp(esp_modem_dce_t *dce, const char *line)
 {
     esp_err_t err = ESP_FAIL;
@@ -59,20 +47,9 @@ static esp_err_t sim800_handle_atd_ppp(esp_modem_dce_t *dce, const char *line)
 }
 
 /**
- * @brief Set Working Mode
+ * @brief Set data mode specific to SIM800
  *
- * @param dce Modem DCE object
- * @param mode woking mode
- * @return esp_err_t
- *      - ESP_OK on success
- *      - ESP_FAIL on error
  */
-//static esp_err_t sim800_set_working_mode(modem_dce_t *dce, modem_mode_t mode)
-//{
-//    const char * mode_commands[] = {"+++", "ATD*99##\r"};
-//    return esp_modem_dce_set_working_mode(dce, mode_commands, mode);
-//}
-
 static esp_err_t sim800_set_data_mode(esp_modem_dce_t *dce, void *param, void *result)
 {
     return esp_modem_dce_generic_command(dce, "ATD*99##\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE,
@@ -81,12 +58,8 @@ static esp_err_t sim800_set_data_mode(esp_modem_dce_t *dce, void *param, void *r
 }
 
 /**
- * @brief Power down
+ * @brief Specific power down command to SMI800
  *
- * @param sim800_dce sim800 object
- * @return esp_err_t
- *      - ESP_OK on success
- *      - ESP_FAIL on error
  */
 static esp_err_t sim800_power_down(esp_modem_dce_t *dce, void *param, void *result)
 {
@@ -95,54 +68,26 @@ static esp_err_t sim800_power_down(esp_modem_dce_t *dce, void *param, void *resu
 }
 
 
-static esp_err_t sim800_power_up(esp_modem_dce_t* dce)
+static esp_err_t sim800_start_up(esp_modem_dce_t* dce)
 {
-    if (esp_modem_command_list_run(dce, "sync", NULL, NULL) != ESP_OK) {
-        vTaskDelay(pdMS_TO_TICKS(30000));
+    if (esp_modem_dce_default_start_up(dce) != ESP_OK) {
+        esp_modem_wait_ms(30000); // SIM800 wakes-up 30s after sending a command
     }
-    ESP_MODEM_ERR_CHECK(esp_modem_command_list_run(dce, "sync", NULL, NULL) == ESP_OK, "sending sync failed", err);
-    ESP_MODEM_ERR_CHECK(esp_modem_command_list_run(dce, "set_echo", (void *) false, NULL) == ESP_OK, "set_echo failed", err);
-    ESP_MODEM_ERR_CHECK(
-            esp_modem_command_list_run(dce, "set_flow_ctrl", (void *) MODEM_FLOW_CONTROL_NONE, NULL) == ESP_OK, "set_flow_ctrl failed", err);
-    ESP_MODEM_ERR_CHECK(esp_modem_command_list_run(dce, "store_profile", NULL, NULL) == ESP_OK, "store_profile failed", err);
-    return ESP_OK;
-    err:
-    return ESP_FAIL;
+    return esp_modem_dce_default_start_up(dce);
 }
 
 
-
-
-esp_modem_dce_t *esp_sim800_create(esp_modem_dte_t *dte, esp_modem_dce_config_t *config)
+esp_err_t esp_modem_sim800_specific_init(esp_modem_dce_t *dce)
 {
-    esp_modem_dce_t *dce = calloc(1, sizeof(esp_modem_dce_t));
-    ESP_MODEM_ERR_CHECK(dce, "calloc sim7600_dce failed", err);
-    esp_err_t err = esp_sim800_init(dce, dte, config);
-    ESP_MODEM_ERR_CHECK(err == ESP_OK, "sim800_init has failed", err);
-    return dce;
-err:
-    return NULL;
-}
-
-
-esp_err_t esp_sim800_init(esp_modem_dce_t *dce, esp_modem_dte_t *dte, esp_modem_dce_config_t *config)
-{
-    /* init the default DCE first */
-    ESP_MODEM_ERR_CHECK(dce && dte && config, "failed to init with zero dce, dte or configuration", err_params);
-    esp_err_t err = esp_modem_dce_default_init(dce, config);
-    ESP_MODEM_ERR_CHECK(err == ESP_OK, "dce default init has failed", err);
-    /* Bind DTE with DCE */
-    dce->dte = dte;
-    dte->dce = dce;
-    ESP_MODEM_ERR_CHECK(esp_modem_set_default_command_list(dce) == ESP_OK, "esp_modem_dce_set_default_commands failed", err);
-
+    ESP_MODEM_ERR_CHECK(dce, "failed to specific init with zero dce", err_params);
     /* Update some commands which differ from the defaults */
-    ESP_MODEM_ERR_CHECK(esp_modem_command_list_set_cmd(dce, "set_data_mode", sim800_set_data_mode) == ESP_OK, "esp_modem_dce_set_command failed", err);
-    ESP_MODEM_ERR_CHECK(esp_modem_command_list_set_cmd(dce, "power_down", sim800_power_down) == ESP_OK, "esp_modem_dce_set_command failed", err);
-
-    /* Perform the initial sync */
-    dce->start_up = sim800_power_up;
-
+    if (dce->config.populate_command_list) {
+        ESP_MODEM_ERR_CHECK(esp_modem_command_list_set_cmd(dce, "set_data_mode", sim800_set_data_mode) == ESP_OK, "esp_modem_dce_set_command failed", err);
+        ESP_MODEM_ERR_CHECK(esp_modem_command_list_set_cmd(dce, "power_down", sim800_power_down) == ESP_OK, "esp_modem_dce_set_command failed", err);
+    } else {
+        dce->set_data_mode = sim800_set_data_mode;
+    }
+    dce->start_up = sim800_start_up;
     return ESP_OK;
 err:
     return ESP_FAIL;

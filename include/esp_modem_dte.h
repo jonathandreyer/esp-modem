@@ -1,4 +1,4 @@
-// Copyright 2018 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2018-2020 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,35 +21,25 @@ extern "C" {
 #include "esp_err.h"
 #include "esp_event.h"
 
-typedef struct esp_modem_dte esp_modem_dte_t;
-typedef struct esp_modem_dce esp_modem_dce_t;
-
 /**
  * @brief Working mode of Modem
  *
  */
 typedef enum {
-    MODEM_COMMAND_MODE = 0, /*!< Command Mode */
-    MODEM_PPP_MODE          /*!< PPP Mode */
+    ESP_MODEM_COMMAND_MODE = 0, /*!< Command Mode */
+    ESP_MODEM_PPP_MODE,         /*!< PPP Mode */
+    ESP_MODEM_TRANSITION_MODE   /*!< Transition Mode between data and command mode indicating that
+                                 the modem is not yet ready for sending commands nor data */
 } esp_modem_mode_t;
-
-/**
- * @brief Modem flow control type
- *
- */
-typedef enum {
-    MODEM_FLOW_CONTROL_NONE = 0,
-    MODEM_FLOW_CONTROL_SW,
-    MODEM_FLOW_CONTROL_HW
-} modem_flow_ctrl_t;
 
 /**
  * @brief DTE(Data Terminal Equipment)
  *
  */
 struct esp_modem_dte {
-    modem_flow_ctrl_t flow_ctrl;                                                    /*!< Flow control of DTE */
+    esp_modem_flow_ctrl_t flow_ctrl;                                                    /*!< Flow control of DTE */
     esp_modem_dce_t *dce;                                                               /*!< DCE which connected to the DTE */
+    struct esp_modem_netif_driver_s *netif_adapter;
     esp_err_t (*send_cmd)(esp_modem_dte_t *dte, const char *command, uint32_t timeout); /*!< Send command to DCE */
     int (*send_data)(esp_modem_dte_t *dte, const char *data, uint32_t length);          /*!< Send data to DCE */
     esp_err_t (*send_wait)(esp_modem_dte_t *dte, const char *data, uint32_t length,
@@ -58,6 +48,44 @@ struct esp_modem_dte {
     esp_err_t (*process_cmd_done)(esp_modem_dte_t *dte);                   /*!< Callback when DCE process command done */
     esp_err_t (*deinit)(esp_modem_dte_t *dte);                             /*!< Deinitialize */
 };
+
+/**
+ * @brief Type used for reception callback
+ *
+ */
+typedef esp_err_t (*esp_modem_on_receive)(void *buffer, size_t len, void *context);
+
+/**
+ * @brief Setup on reception callback
+ *
+ * @param dte ESP Modem DTE object
+ * @param receive_cb Function pointer to the reception callback
+ * @param receive_cb_ctx Contextual pointer to be passed to the reception callback
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_modem_set_rx_cb(esp_modem_dte_t *dte, esp_modem_on_receive receive_cb, void *receive_cb_ctx);
+
+/**
+ * @brief Notify the modem, that ppp netif has closed
+ *
+ * @note This API should only be used internally by the modem-netif layer
+ *
+ * @param dte ESP Modem DTE object
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_modem_notify_ppp_netif_closed(esp_modem_dte_t *dte);
+
+/**
+ * @brief Notify the modem, that all the modem units (DTE, DCE, PPP) has
+ * been properly initialized and DTE loop can safely start
+ *
+ * @param dte ESP Modem DTE object
+ *
+ * @return ESP_OK on success
+ */
+esp_err_t esp_modem_notify_initialized(esp_modem_dte_t *dte);
 
 #ifdef __cplusplus
 }

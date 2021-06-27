@@ -1,4 +1,4 @@
-// Copyright 2015-2018 Espressif Systems (Shanghai) PTE LTD
+// Copyright 2020 Espressif Systems (Shanghai) PTE LTD
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,23 +13,4 @@
 // limitations under the License.
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-//#include "esp_modem_dce_service.h"
-#include "esp_modem.h"
-
-/**
- * @brief Create and initialize SIM7600 object
- *
- * @param dte Modem DTE object
- * @return modem_dce_t* Modem DCE object
- */
-esp_modem_dce_t *esp_sim7600_create(esp_modem_dte_t *dte, esp_modem_dce_config_t *config);
-
-esp_err_t esp_sim7600_init(esp_modem_dce_t *dce, esp_modem_dte_t *dte, esp_modem_dce_config_t *config);
-
-#ifdef __cplusplus
-}
-#endif
+#include "esp_modem_compat.h"
