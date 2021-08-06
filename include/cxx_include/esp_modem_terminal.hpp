@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _ESP_MODEM_TERMINAL_HPP_
-#define _ESP_MODEM_TERMINAL_HPP_
+#pragma once
 
 #include <memory>
 #include <functional>
@@ -45,15 +44,21 @@ enum class terminal_error {
 };
 
 /**
- * @brief Terminal interface. All communication interfaces must comply this interface in order to be used as a DTE
+ * @brief Terminal interface. All communication interfaces must comply to this interface in order to be used as a DTE
  */
 class Terminal {
 public:
     virtual ~Terminal() = default;
 
-    void set_error_cb(std::function<void(terminal_error)> f) { on_error = std::move(f); }
+    void set_error_cb(std::function<void(terminal_error)> f)
+    {
+        on_error = std::move(f);
+    }
 
-    virtual void set_read_cb(std::function<bool(uint8_t *data, size_t len)> f) { on_data = std::move(f); }
+    virtual void set_read_cb(std::function<bool(uint8_t *data, size_t len)> f)
+    {
+        on_read = std::move(f);
+    }
 
     /**
      * @brief Writes data to the terminal
@@ -76,7 +81,7 @@ public:
     virtual void stop() = 0;
 
 protected:
-    std::function<bool(uint8_t *data, size_t len)> on_data;
+    std::function<bool(uint8_t *data, size_t len)> on_read;
     std::function<void(terminal_error)> on_error;
 };
 
@@ -85,5 +90,3 @@ protected:
  */
 
 } // namespace esp_modem
-
-#endif // _ESP_MODEM_TERMINAL_HPP_

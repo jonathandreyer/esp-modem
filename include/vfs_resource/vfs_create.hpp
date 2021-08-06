@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _VFS_CREATE_HPP_
-#define _VFS_CREATE_HPP_
+#pragma once
 
 #define ESP_MODEM_VFS_DEFAULT_UART_CONFIG(name)  {  \
         .dev_name = (name), \
@@ -38,7 +37,7 @@
  * @brief UART init struct for VFS
  */
 struct esp_modem_vfs_uart_creator {
-    const char* dev_name;                       /*!< VFS device name, e.g. /dev/uart/n */
+    const char *dev_name;                       /*!< VFS device name, e.g. /dev/uart/n */
     const struct esp_modem_uart_term_config uart;     /*!< UART driver init struct */
 };
 
@@ -46,7 +45,7 @@ struct esp_modem_vfs_uart_creator {
  * @brief UART init struct for VFS
  */
 struct esp_modem_vfs_socket_creator {
-    const char* host_name;                    /*!< VFS socket: host name (or IP address) */
+    const char *host_name;                    /*!< VFS socket: host name (or IP address) */
     int port;                                 /*!< VFS socket: port number */
 };
 
@@ -67,6 +66,3 @@ bool vfs_create_socket(struct esp_modem_vfs_socket_creator *config, struct esp_m
  * @return true on success
  */
 bool vfs_create_uart(struct esp_modem_vfs_uart_creator *config, struct esp_modem_vfs_term_config *created_config);
-
-
-#endif //_VFS_CREATE_HPP_

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _ESP_MODEM_EXCEPTION_HPP_
-#define _ESP_MODEM_EXCEPTION_HPP_
+#pragma once
 
 #include <string>
 #include "esp_err.h"
@@ -27,9 +26,13 @@ public:
     explicit esp_err_exception(esp_err_t err): esp_err(err) {}
     explicit esp_err_exception(std::string msg): esp_err(ESP_FAIL), message(std::move(msg)) {}
     explicit esp_err_exception(std::string msg, esp_err_t err): esp_err(err), message(std::move(msg)) {}
-    virtual esp_err_t get_err_t() { return esp_err; }
+    virtual esp_err_t get_err_t()
+    {
+        return esp_err;
+    }
     ~esp_err_exception() noexcept override = default;
-    virtual const char* what() const noexcept {
+    virtual const char *what() const noexcept
+    {
         return message.c_str();
     }
 private:
@@ -62,5 +65,3 @@ static inline void throw_if_esp_fail(esp_err_t err)
 }
 
 } // namespace esp_modem
-
-#endif //_ESP_MODEM_EXCEPTION_HPP_

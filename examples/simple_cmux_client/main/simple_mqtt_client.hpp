@@ -6,8 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-#ifndef _SIMPLE_MQTT_CLIENT_H_
-#define _SIMPLE_MQTT_CLIENT_H_
+#pragma once
 
 #include <string>
 #include <memory>
@@ -25,7 +24,7 @@ public:
         DATA,
     };
 
-    explicit MqttClient(const std::string & uri);
+    explicit MqttClient(const std::string &uri);
     ~MqttClient();
 
     /**
@@ -40,7 +39,7 @@ public:
      * @param qos QoS (0 by default)
      * @return message id
      */
-    int publish(const std::string & topic, const std::string & data, int qos = 0);
+    int publish(const std::string &topic, const std::string &data, int qos = 0);
 
     /**
      * @brief Subscribe to a topic
@@ -48,7 +47,7 @@ public:
      * @param qos QoS (0 by default)
      * @return message id
      */
-    int subscribe(const std::string & topic, int qos = 0);
+    int subscribe(const std::string &topic, int qos = 0);
 
     /**
      * @brief Get topic from event data
@@ -72,6 +71,3 @@ public:
 private:
     std::unique_ptr<MqttClientHandle> h;
 };
-
-
-#endif //_SIMPLE_MQTT_CLIENT_H_

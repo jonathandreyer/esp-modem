@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _ESP_MODEM_API_HPP_
-#define _ESP_MODEM_API_HPP_
+#pragma once
 
 #include <memory>
 #include "cxx_include/esp_modem_dce.hpp"
@@ -74,7 +73,7 @@ std::shared_ptr<DTE> create_vfs_dte(const dte_config *config);
 /**
  * @brief Create DCE based on SIM7600 module
  * @param config DCE configuration
- * @param DTE reference to the communicating DTE
+ * @param dte reference to the communicating DTE
  * @param netif reference to the network interface
  *
  * @return unique ptr to the created DCE on success
@@ -103,5 +102,3 @@ std::unique_ptr<DCE> create_generic_dce(const dce_config *config, std::shared_pt
  */
 
 } // namespace esp_modem
-
-#endif // _ESP_MODEM_API_HPP_

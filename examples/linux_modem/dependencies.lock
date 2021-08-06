@@ -1,8 +1,0 @@
-dependencies:
-  idf:
-    component_hash: null
-    source:
-      type: idf
-    version: '*'
-manifest_hash: 0f314f6e2379d30654523b32357e99557c96ad1f473f0447e889c8466d9f11d9
-version: 1.0.0

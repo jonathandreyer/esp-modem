@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _ESP_MODEM_COMMAND_LIBRARY_HPP_
-#define _ESP_MODEM_COMMAND_LIBRARY_HPP_
+#pragma once
 
 #include "esp_modem_dte.hpp"
 #include "esp_modem_dce_module.hpp"
@@ -37,17 +36,17 @@ namespace dce_commands {
 #define ESP_MODEM_DECLARE_DCE_COMMAND(name, return_type, num, ...) \
         return_type name(CommandableIf *t, ## __VA_ARGS__);
 
-        DECLARE_ALL_COMMAND_APIS(declare name(Commandable *p, ...);)
+DECLARE_ALL_COMMAND_APIS(declare name(Commandable *p, ...);)
 
 #undef ESP_MODEM_DECLARE_DCE_COMMAND
 
 /**
  * @brief Following commands that are different for some specific modules
  */
-command_result get_battery_status_sim7xxx(CommandableIf* t, int& voltage, int &bcs, int &bcl);
-command_result power_down_sim7xxx(CommandableIf* t);
-command_result power_down_sim8xx(CommandableIf* t);
-command_result set_data_mode_sim8xx(CommandableIf* t);
+command_result get_battery_status_sim7xxx(CommandableIf *t, int &voltage, int &bcs, int &bcl);
+command_result power_down_sim7xxx(CommandableIf *t);
+command_result power_down_sim8xx(CommandableIf *t);
+command_result set_data_mode_sim8xx(CommandableIf *t);
 
 /**
  * @}
@@ -55,5 +54,3 @@ command_result set_data_mode_sim8xx(CommandableIf* t);
 
 } // dce_commands
 } // esp_modem
-
-#endif //_ESP_MODEM_COMMAND_LIBRARY_HPP_

@@ -36,11 +36,11 @@ After the object is created, the application interaction with the DCE is in
 * switching between data and command mode
 
 ### DTE
-Is an abstraction of the connected interface. Current implementation supports only UART
+Is an abstraction of the physical interface connected to the modem. Current implementation supports only UART
 
-### PPP
+### PPP netif
 
-Is used to connect the specific network interface to the modem data mode. Currently implementation supports only PPPoS protocol.
+Is used to attach the specific network interface to a network communication protocol used by the modem. Currently implementation supports only PPPoS protocol.
 
 ### Module
 
@@ -48,7 +48,7 @@ Abstraction of the specific modem device. Currently the component supports SIM80
 
 ## Use cases
 
-Users could interact with the esp-modem using the DCE's interface, to basically
+Users interact with the esp-modem using the DCE's interface, to basically
 * Switch between command and data mode to connect to the internet via cellular network.
 * Send various commands to the device (e.g. send SMS)
 
@@ -57,16 +57,15 @@ IP address changes.
 
 Common use cases of the esp-modem are also listed as the examples:
 * `examples/pppos_client` -- simple client which reads some module properties and switches to the data mode to connect to a public mqtt broker.
-* `examples/modem_console` -- is an example to exercise all possible modules commands in a console application.
-* `examples/ap_to_pppos` -- this example focuses on the network connectivity of the esp-modem and provides a WiFi AP
-  that forwards packets (and uses NAT) to and from the PPPoS connection.
+* `examples/modem_console` -- is an example to exercise all possible module commands in a console application.
+* `examples/ap_to_pppos` -- this example focuses on the network connectivity of the esp-modem and provides a WiFi AP that forwards packets (and uses NAT) to and from the PPPoS connection.
 
 ## Extensibility
 
 ### CMUX
 
 Implementation of virtual terminals is an experimental feature, which allows users to also issue commands in the data mode,
-after creating multiple virtual terminals, designating some of them solely to the data mode, while other to command mode.
+after creating multiple virtual terminals, designating some of them solely to data mode, others solely to command mode.
 
 ### DTE's
 
@@ -74,6 +73,6 @@ Currently we support only UART, but modern modules support other communication i
 
 ### Other devices
 
-Adding a new device is a must-have requirement for the esp-component. Different modules support different commands,
+Adding a new device is a must-have requirement for the esp-modem component. Different modules support different commands,
 or some commands might have a different implementation. Adding a new device means to provide a new implementation
 as a class derived from `GenericModule`, where we could add new commands or modify the existing ones.

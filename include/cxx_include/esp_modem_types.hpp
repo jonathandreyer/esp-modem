@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _ESP_MODEM_TYPES_HPP_
-#define _ESP_MODEM_TYPES_HPP_
+#pragma once
 
 #include <functional>
 #include <string>
@@ -85,7 +84,7 @@ public:
 class ModuleIf {
 public:
     /**
-     * @brief Sets the data mode up (provides the necessary configuration to connect to the cellular network
+     * @brief Sets the data mode up (provides the necessary configuration to connect to the cellular network)
      * @return true on success
      */
     virtual bool setup_data_mode() = 0;
@@ -103,5 +102,3 @@ public:
  */
 
 } // namespace esp_modem
-
-#endif // _ESP_MODEM_TYPES_HPP_

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _ESP_MODEM_DCE_MODULE_
-#define _ESP_MODEM_DCE_MODULE_
+#pragma once
 
 #include <memory>
 #include <utility>
@@ -48,8 +47,8 @@ public:
      * The configuration could be either the dce-config struct or just a pdp context
      */
     explicit GenericModule(std::shared_ptr<DTE> dte, std::unique_ptr<PdpContext> pdp):
-            dte(std::move(dte)), pdp(std::move(pdp)) {}
-    explicit GenericModule(std::shared_ptr<DTE> dte, const esp_modem_dce_config* config);
+        dte(std::move(dte)), pdp(std::move(pdp)) {}
+    explicit GenericModule(std::shared_ptr<DTE> dte, const esp_modem_dce_config *config);
 
     /**
      * @brief This is a mandatory method for ModuleIf class, which sets up the device
@@ -59,10 +58,12 @@ public:
      */
     bool setup_data_mode() override
     {
-        if (set_echo(false) != command_result::OK)
+        if (set_echo(false) != command_result::OK) {
             return false;
-        if (set_pdp_context(*pdp) != command_result::OK)
+        }
+        if (set_pdp_context(*pdp) != command_result::OK) {
             return false;
+        }
         return true;
     }
 
@@ -73,8 +74,9 @@ public:
     bool set_mode(modem_mode mode) override
     {
         if (mode == modem_mode::DATA_MODE) {
-            if (set_data_mode() != command_result::OK)
+            if (set_data_mode() != command_result::OK) {
                 return resume_data_mode() == command_result::OK;
+            }
             return true;
         } else if (mode == modem_mode::COMMAND_MODE) {
             return set_command_mode() == command_result::OK;
@@ -116,8 +118,8 @@ protected:
 class SIM7600: public GenericModule {
     using GenericModule::GenericModule;
 public:
-    command_result get_module_name(std::string& name) override;
-    command_result get_battery_status(int& voltage, int &bcs, int &bcl) override;
+    command_result get_module_name(std::string &name) override;
+    command_result get_battery_status(int &voltage, int &bcs, int &bcl) override;
     command_result power_down() override;
 };
 
@@ -127,7 +129,7 @@ public:
 class SIM800: public GenericModule {
     using GenericModule::GenericModule;
 public:
-    command_result get_module_name(std::string& name) override;
+    command_result get_module_name(std::string &name) override;
     command_result power_down() override;
     command_result set_data_mode() override;
 };
@@ -138,7 +140,7 @@ public:
 class BG96: public GenericModule {
     using GenericModule::GenericModule;
 public:
-    command_result get_module_name(std::string& name) override;
+    command_result get_module_name(std::string &name) override;
 };
 
 /**
@@ -146,5 +148,3 @@ public:
  */
 
 } // namespace esp_modem
-
-#endif // _ESP_MODEM_DCE_MODULE_

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _ESP_MODEM_PRIMITIVES_HPP_
-#define _ESP_MODEM_PRIMITIVES_HPP_
+#pragma once
 
 #include "esp_event.h"
 #include "esp_modem_exception.hpp"
@@ -25,7 +24,7 @@
 #else
 // forward declarations of FreeRTOS primitives
 struct QueueDefinition;
-typedef void * EventGroupHandle_t;
+typedef void *EventGroupHandle_t;
 #endif
 
 
@@ -33,7 +32,7 @@ namespace esp_modem {
 
 // Forward declaration for both linux/FreeRTOS targets
 //
-using TaskFunction_t = void (*)(void*);
+using TaskFunction_t = void (*)(void *);
 #if !defined(CONFIG_IDF_TARGET_LINUX)
 struct Lock {
     using MutexT = QueueHandle_t;
@@ -57,11 +56,17 @@ static constexpr uint32_t portMAX_DELAY = UINT32_MAX;
 template<class T>
 class Scoped {
 public:
-    explicit Scoped(T &l):lock(l) { lock.lock(); }
-    ~Scoped() { lock.unlock(); }
+    explicit Scoped(T &l): lock(l)
+    {
+        lock.lock();
+    }
+    ~Scoped()
+    {
+        lock.unlock();
+    }
 
 private:
-    T& lock;
+    T &lock;
 };
 
 class Task {
@@ -104,5 +109,3 @@ private:
 };
 
 } // namespace esp_modem
-
-#endif // _ESP_MODEM_PRIMITIVES_HPP_

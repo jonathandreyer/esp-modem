@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _ESP_MODEM_NETIF_HPP
-#define _ESP_MODEM_NETIF_HPP
+#pragma once
 
 #include <memory>
 #include <cstddef>
@@ -74,7 +73,7 @@ private:
 
     std::shared_ptr<DTE> ppp_dte;
     esp_netif_t *netif;
-    struct ppp_netif_driver driver{};
+    struct ppp_netif_driver driver {};
     SignalGroup signal;
     static const size_t PPP_STARTED = SignalGroup::bit0;
     static const size_t PPP_EXIT = SignalGroup::bit1;
@@ -85,5 +84,3 @@ private:
  */
 
 } // namespace esp_modem
-
-#endif // _ESP_MODEM_NETIF_HPP

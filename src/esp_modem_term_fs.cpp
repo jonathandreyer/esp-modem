@@ -29,7 +29,8 @@ struct File {
         fd(config->vfs_config.fd), deleter(config->vfs_config.deleter), resource(config->vfs_config.resource)
     {}
 
-    ~File() {
+    ~File()
+    {
         if (deleter) {
             deleter(fd, resource);
         }
@@ -45,11 +46,13 @@ public:
 
     ~FdTerminal() override;
 
-    void start() override {
+    void start() override
+    {
         signal.set(TASK_START);
     }
 
-    void stop() override {
+    void stop() override
+    {
         signal.clear(TASK_START);
     }
 
@@ -57,8 +60,9 @@ public:
 
     int read(uint8_t *data, size_t len) override;
 
-    void set_read_cb(std::function<bool(uint8_t *data, size_t len)> f) override {
-        on_data = std::move(f);
+    void set_read_cb(std::function<bool(uint8_t *data, size_t len)> f) override
+    {
+        on_read = std::move(f);
         signal.set(TASK_PARAMS);
     }
 
@@ -75,26 +79,28 @@ private:
     Task task_handle;
 };
 
-std::unique_ptr<Terminal> create_vfs_terminal(const esp_modem_dte_config *config) {
+std::unique_ptr<Terminal> create_vfs_terminal(const esp_modem_dte_config *config)
+{
     TRY_CATCH_RET_NULL(
-            auto term = std::make_unique<FdTerminal>(config);
-            term->start();
-            return term;
+        auto term = std::make_unique<FdTerminal>(config);
+        term->start();
+        return term;
     )
 }
 
 FdTerminal::FdTerminal(const esp_modem_dte_config *config) :
-        f(config), signal(),
-        task_handle(config->task_stack_size, config->task_priority, this, [](void* p){
-            auto t = static_cast<FdTerminal *>(p);
-            t->task();
-            Task::Delete();
-        })
-        {}
+    f(config), signal(),
+    task_handle(config->task_stack_size, config->task_priority, this, [](void *p)
+{
+    auto t = static_cast<FdTerminal *>(p);
+    t->task();
+    Task::Delete();
+})
+{}
 
 void FdTerminal::task()
 {
-    std::function<bool(uint8_t *data, size_t len)> on_data_priv = nullptr;
+    std::function<bool(uint8_t *data, size_t len)> on_read_priv = nullptr;
     signal.set(TASK_INIT);
     signal.wait_any(TASK_START | TASK_STOP, portMAX_DELAY);
     if (signal.is_any(TASK_STOP)) {
@@ -105,15 +111,15 @@ void FdTerminal::task()
         int s;
         fd_set rfds;
         struct timeval tv = {
-                .tv_sec = 1,
-                .tv_usec = 0,
+            .tv_sec = 1,
+            .tv_usec = 0,
         };
         FD_ZERO(&rfds);
         FD_SET(f.fd, &rfds);
 
         s = select(f.fd + 1, &rfds, nullptr, nullptr, &tv);
         if (signal.is_any(TASK_PARAMS)) {
-            on_data_priv = on_data;
+            on_read_priv = on_read;
             signal.clear(TASK_PARAMS);
         }
 
@@ -123,9 +129,9 @@ void FdTerminal::task()
 //            ESP_LOGV(TAG, "Select exited with timeout");
         } else {
             if (FD_ISSET(f.fd, &rfds)) {
-                if (on_data_priv) {
-                    if (on_data_priv(nullptr, 0)) {
-                        on_data_priv = nullptr;
+                if (on_read_priv) {
+                    if (on_read_priv(nullptr, 0)) {
+                        on_read_priv = nullptr;
                     }
                 }
             }
