@@ -1,5 +1,7 @@
 # ESP MODEM
 
+*This repository is archived and is replaced by [esp-protocol](https://github.com/espressif/esp-protocols).*
+
 The `esp-modem` component is a managed component for `esp-idf` that is used for communication with GSM/LTE modems
 that support AT commands and PPP protocol as a network interface.
 
